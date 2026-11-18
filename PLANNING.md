@@ -4,213 +4,208 @@ This document covers what SimplePOS is, who it's for, and how it's built. For th
 
 ## 1. Vision
 
-A point-of-sale app that a small seller can install and start using in under five minutes. It needs no account, subscription or internet connection. It should feel as quick as a calculator at the counter and keep accurate records for the end of the day.
+A phone point-of-sale app for a small family biryani restaurant. The owner enters each order on his phone during rush hours, tags it Pending, Paid Cash or Paid UPI, and fixes or deletes orders quickly. At the end of the day he sees how many plates of each item were sold and how much money came in; weekly and monthly summaries show the bigger picture.
 
-### Target users
+It needs no account, subscription or internet connection. Speed and simplicity at the counter come first. More features will be added gradually.
 
-- Market stall and pop-up vendors
-- Small cafés, kiosks and food trucks
-- Hobby sellers at fairs and events
+### Users
+
+- The restaurant owner, entering orders on one phone (Android or iPhone)
+- The family, reading daily, weekly and monthly summaries (shared on WhatsApp)
+
+### Menu
+
+Small and fixed. Names and prices are editable in the app; these are the starting placeholders:
+
+| Item | Price |
+| ---- | ----- |
+| Chicken Biryani Half / Full | ₹120 / ₹200 |
+| Mutton Biryani Half / Full | ₹180 / ₹320 |
+| Chicken 65 | ₹150 |
+| Water Bottle | ₹20 |
 
 ### Goals
 
-- Record a typical sale in **3 taps or fewer** after the products are set up.
-- Work **fully offline** and keep data safe on the device.
-- Give accurate **daily totals** and an easy **CSV export** for accounting.
-- Run well on **phones and tablets**, on both iOS and Android.
+- Save an order in **2–3 taps**: tap the items, then tap one status button.
+- Edit, mark paid, or delete an order in one or two taps, with Undo for delete.
+- Accurate **per-item plate counts** and **cash / UPI / pending** totals for any day, week or month.
+- Work **fully offline**, with data kept on the phone and a one-tap backup.
+- Large, high-contrast buttons that are easy to hit in a hurry.
 
 ### Non-goals for v1
 
-- Multi-device sync or a cloud backend
-- Inventory tracking across multiple locations
-- Integrated card-payment terminals (card sales are recorded, not processed)
-- Staff accounts and permissions
-- Fiscal or tax-authority compliance for specific countries
+- Multi-phone sync or a cloud backend
+- Printed bills or receipts
+- Discounts, taxes, or cash change calculation
+- Stock/inventory tracking
+- Staff accounts
+- Customer names or table numbers
 
-## 2. Features and user stories
+## 2. Features
 
-| #  | As a seller, I want to…                                      | Priority |
-| -- | ------------------------------------------------------------ | -------- |
-| 1  | add, edit and delete products with a price and category      | Must     |
-| 2  | tap products to build a cart and change quantities           | Must     |
-| 3  | take cash and see the change due                             | Must     |
-| 4  | record card or other payments                                | Must     |
-| 5  | see a list of past orders and open any receipt               | Must     |
-| 6  | see today's total sales and order count                      | Must     |
-| 7  | apply a percentage or fixed discount to an order             | Should   |
-| 8  | apply a tax rate (inclusive or exclusive)                    | Should   |
-| 9  | void or refund an order                                      | Should   |
-| 10 | import products from a CSV file                              | Should   |
-| 11 | export orders to CSV for a date range                        | Should   |
-| 12 | share a receipt as text or a PDF                             | Could    |
-| 13 | back up and restore the whole database                       | Should   |
-| 14 | search the product grid and filter by category               | Should   |
-| 15 | set the shop name, currency and receipt footer               | Must     |
-| 16 | use a dark theme                                             | Could    |
-| 17 | track stock levels with low-stock warnings                   | Could    |
-| 18 | scan barcodes to add items                                   | Won't (v1) |
+| #  | Feature | Status |
+| -- | ------- | ------ |
+| 1  | Tap item tiles to build an order; "−" removes one | ✅ v1 |
+| 2  | Save as **Pending**, **Paid Cash** or **Paid UPI** in one tap | ✅ v1 |
+| 3  | Order numbers restart at #1 each day and are never reused that day | ✅ v1 |
+| 4  | Today's orders list with All / Pending / Paid filters | ✅ v1 |
+| 5  | Mark a pending order paid (Cash/UPI) straight from the list | ✅ v1 |
+| 6  | Edit any order (items, status, tag) | ✅ v1 |
+| 7  | Delete an order with a 6-second Undo | ✅ v1 |
+| 8  | Browse orders of earlier days | ✅ v1 |
+| 9  | Summary for Day / Week (Mon–Sun) / Month, browsable back in time | ✅ v1 |
+| 10 | Summary shows total sales, cash, UPI, pending, plates per item, day-by-day | ✅ v1 |
+| 11 | Share a summary as text (WhatsApp, SMS) | ✅ v1 |
+| 12 | Optional Dine-in / Parcel tag, hidden unless turned on in Settings | ✅ v1 |
+| 13 | Edit menu: name, price, colour, order, hide, add, delete | ✅ v1 |
+| 14 | Restaurant name setting | ✅ v1 |
+| 15 | Backup export (JSON via share sheet) and restore | ✅ v1 |
+| 16 | Cloud sync across phones | Later |
+| 17 | Bill printing / sharing a bill | Later |
+| 18 | Customer name or table note on an order | Later |
+| 19 | "Business day ends at" setting for closing after midnight | Later |
+| 20 | Sales charts, CSV export, Hindi/Telugu labels | Later |
 
 ## 3. Screens and navigation
 
-The app uses Expo Router with a root stack that contains a bottom-tab group.
+The app uses Expo Router: a root stack containing four bottom tabs, plus an Edit screen.
 
 ```
 src/app/
-├── _layout.tsx                 Root Stack + SQLiteProvider + migrations
+├── _layout.tsx                 Root Stack + SQLiteProvider (migrations) + ToastProvider
 ├── (tabs)/
 │   ├── _layout.tsx             Tab navigator
-│   ├── index.tsx               Sell: product grid + cart
-│   ├── orders.tsx              Orders: history list, grouped by day
-│   ├── products.tsx            Products: catalog management
-│   └── reports.tsx             Reports: totals, best sellers
-├── checkout.tsx                Modal: payment method, tendered, change
-├── order/[id].tsx              Order detail / receipt, void/refund
-├── product/[id].tsx            Add/edit product (id = "new" for create)
-└── settings.tsx                Shop info, currency, tax, backup/restore
+│   ├── index.tsx               New Order: item tiles + total + 3 status buttons
+│   ├── orders.tsx              Orders: one day's list, filters, quick mark-paid
+│   ├── summary.tsx             Summary: Day / Week / Month totals, Share
+│   └── settings.tsx            Menu editor, Dine-in/Parcel toggle, name, backup
+└── order/[id].tsx              Edit Order: same editor as New Order, plus Delete
 ```
 
-### Sell screen layout
+### New Order layout
 
-- **Phone:** the product grid fills the screen, with a sticky cart bar at the bottom showing the item count and total. Tapping the bar opens the cart sheet, and "Charge" opens checkout.
-- **Tablet:** a split view, with the product grid on the left (about 65%) and the live cart on the right (about 35%).
+- Item tiles fill the screen: 2 columns on phones, 3–4 on tablets. Each tile has its own colour, its name and price, a quantity badge, and a "−" button once added.
+- A bottom panel shows the optional Dine-in/Parcel switch, the item count, a Clear button, the total, and three large buttons: **Pending · Paid Cash · Paid UPI**. Tapping one saves the order and clears the screen.
+- Confirmations appear as a toast at the **top** of the screen, so they never cover the buttons.
 
 ## 4. Architecture
 
 ```
-┌────────────────────────────┐
-│  Screens (src/app)         │  Expo Router routes, layout only
-├────────────────────────────┤
-│  Components (src/components)│ Presentational UI
-├────────────────────────────┤
-│  Hooks / state             │  useCart, useProducts, useOrders
-├────────────────────────────┤
-│  Domain logic (src/lib)    │  money, totals, tax, CSV (pure, tested)
-├────────────────────────────┤
-│  Data access (src/db)      │  schema, migrations, typed queries
-├────────────────────────────┤
-│  expo-sqlite               │  on-device SQLite database
-└────────────────────────────┘
+┌──────────────────────────────┐
+│  Screens (src/app)           │  Expo Router routes; load data on focus
+├──────────────────────────────┤
+│  Components (src/components) │  OrderEditor, ItemTile, OrderCard, Toast, …
+├──────────────────────────────┤
+│  Domain logic (src/lib)      │  dates, summary maths, formatting (pure, tested)
+├──────────────────────────────┤
+│  Data access (src/db)        │  migrations, orders, menu, settings, backup
+├──────────────────────────────┤
+│  expo-sqlite                 │  on-device SQLite database (simplepos.db)
+└──────────────────────────────┘
 ```
 
 ### Key decisions
 
 | Decision | Choice | Rationale |
 | -------- | ------ | --------- |
-| Storage | `expo-sqlite` | Relational data (orders → items), reliable, and fast for reporting queries |
-| Money | Integer minor units (`price_cents`) | Avoids floating-point rounding errors |
-| Cart state | React context + reducer | The cart is short-lived and local, so no state library is needed |
-| Order snapshots | Copy name/price into `order_items` | Editing a product never rewrites past receipts |
-| IDs | Auto-increment integers, plus a human-readable order number | Simple, and receipts show `#0042` |
-| Timestamps | ISO 8601 UTC strings; display in local time | Sorts correctly and is unambiguous in exports |
-| Currency formatting | `Intl.NumberFormat` | Built in, and handles locale and currency symbols |
-| Migrations | `PRAGMA user_version` with ordered migration steps | No extra dependency |
+| Framework | Expo (React Native) + TypeScript | One codebase for Android and iPhone; test instantly with Expo Go |
+| Storage | `expo-sqlite`, on the phone only | Offline, fast, relational (orders → items). Cloud sync deferred |
+| Money | Whole rupees as integers | No paise on this menu; no rounding errors |
+| Payment status | `pending` / `cash` / `upi` | Lets the summary split cash from UPI to tally the cash box |
+| Order snapshots | Copy name and price into `order_items` | Menu edits never change past orders or reports |
+| Delete | Soft delete (`deleted = 1`) | Makes Undo trivial; deleted orders are excluded everywhere |
+| Order numbers | Per day, `MAX + 1` including deleted | Easy to call out; a deleted number isn't reused |
+| Timestamps | Milliseconds since epoch, local-day ranges | Simple range queries for day / week / month |
+| Week | Monday to Sunday | Common in India |
+| State | Screens re-query SQLite on focus; a tiny "data changed" event refreshes open screens after Undo | No state library needed |
+| Migrations | `PRAGMA user_version` with ordered steps in `src/db/migrate.ts` | No extra dependency |
 
 ## 5. Data model
 
 ```sql
-CREATE TABLE categories (
+CREATE TABLE menu_items (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  name        TEXT NOT NULL UNIQUE,
-  color       TEXT,
-  sort_order  INTEGER NOT NULL DEFAULT 0
-);
-
-CREATE TABLE products (
-  id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  name         TEXT NOT NULL,
-  price_cents  INTEGER NOT NULL CHECK (price_cents >= 0),
-  category_id  INTEGER REFERENCES categories(id) ON DELETE SET NULL,
-  sku          TEXT UNIQUE,
-  stock        INTEGER,                 -- NULL = not tracked
-  is_active    INTEGER NOT NULL DEFAULT 1,
-  created_at   TEXT NOT NULL,
-  updated_at   TEXT NOT NULL
+  name        TEXT NOT NULL,
+  price       INTEGER NOT NULL,            -- whole rupees
+  color       TEXT NOT NULL,
+  sort_order  INTEGER NOT NULL,
+  active      INTEGER NOT NULL DEFAULT 1   -- 0 = hidden from the order screen
 );
 
 CREATE TABLE orders (
-  id               INTEGER PRIMARY KEY AUTOINCREMENT,
-  number           INTEGER NOT NULL UNIQUE,
-  status           TEXT NOT NULL CHECK (status IN ('completed','voided','refunded')),
-  subtotal_cents   INTEGER NOT NULL,
-  discount_cents   INTEGER NOT NULL DEFAULT 0,
-  tax_cents        INTEGER NOT NULL DEFAULT 0,
-  total_cents      INTEGER NOT NULL,
-  payment_method   TEXT NOT NULL CHECK (payment_method IN ('cash','card','other')),
-  tendered_cents   INTEGER,
-  change_cents     INTEGER,
-  note             TEXT,
-  created_at       TEXT NOT NULL
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_no    INTEGER NOT NULL,            -- restarts at 1 each day
+  created_at  INTEGER NOT NULL,            -- ms since epoch
+  updated_at  INTEGER NOT NULL,
+  status      TEXT NOT NULL CHECK (status IN ('pending', 'cash', 'upi')),
+  order_type  TEXT CHECK (order_type IN ('dine_in', 'parcel')),  -- NULL = not tagged
+  total       INTEGER NOT NULL,
+  deleted     INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE order_items (
-  id                INTEGER PRIMARY KEY AUTOINCREMENT,
-  order_id          INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  product_id        INTEGER REFERENCES products(id) ON DELETE SET NULL,
-  name              TEXT NOT NULL,      -- snapshot
-  unit_price_cents  INTEGER NOT NULL,   -- snapshot
-  quantity          INTEGER NOT NULL CHECK (quantity > 0),
-  line_total_cents  INTEGER NOT NULL
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id      INTEGER NOT NULL REFERENCES orders (id) ON DELETE CASCADE,
+  menu_item_id  INTEGER,                   -- no FK: the menu item may be deleted later
+  name          TEXT NOT NULL,             -- snapshot
+  price         INTEGER NOT NULL,          -- snapshot
+  qty           INTEGER NOT NULL
 );
 
 CREATE TABLE settings (
-  key    TEXT PRIMARY KEY,
+  key    TEXT PRIMARY KEY NOT NULL,
   value  TEXT NOT NULL
 );
 
-CREATE INDEX idx_orders_created_at ON orders(created_at);
-CREATE INDEX idx_order_items_order ON order_items(order_id);
+CREATE INDEX idx_orders_created ON orders (created_at);
+CREATE INDEX idx_order_items_order ON order_items (order_id);
 ```
 
-**Settings keys:** `shop_name`, `currency` (ISO 4217, e.g. `USD`), `tax_rate_bps` (basis points, e.g. `825` = 8.25%), `tax_inclusive` (`0`/`1`), `receipt_footer`, `next_order_number`.
+**Settings keys:** `show_order_type` (`0`/`1`, default off) and `restaurant_name` (default "Biryani House").
 
-## 6. Pricing rules
+## 6. Summary rules
 
-All values are integer cents, and rounding is half-up at each step:
+These are implemented in `src/lib/summary.ts` and `src/lib/dates.ts`, both unit tested.
 
-1. `line_total = unit_price × quantity`
-2. `subtotal = Σ line_total`
-3. `discount` = fixed amount, or `round(subtotal × pct)`, capped at the subtotal
-4. `taxable = subtotal − discount`
-5. Tax:
-   - exclusive: `tax = round(taxable × rate)`, `total = taxable + tax`
-   - inclusive: `tax = taxable − round(taxable / (1 + rate))`, `total = taxable`
-6. Cash: `change = tendered − total`. Checkout is blocked if `tendered < total`.
+1. Only non-deleted orders with `created_at` inside the period count.
+2. A day runs from local midnight to midnight. A week runs Monday 00:00 to the next Monday. A month runs from the 1st to the 1st of the next month.
+3. `total sales = Σ order.total`, split into **cash**, **UPI** and **pending** by status, each with an order count.
+4. Plates per item are summed by `menu_item_id`, so a rename or price change mid-month still counts as one item. The newest name is shown, and amounts use the price at the time of each order.
+5. Items are listed in menu order. Items no longer on the menu come last.
+6. Week and month views add a day-by-day list (days with orders only, newest first). Tapping a day opens it.
 
-These rules live in `src/lib/totals.ts` and must have full unit test coverage.
+## 7. Backup format
 
-## 7. Import / export formats
+**Export:** every table is written to `simplepos-backup-YYYY-MM-DD.json` and handed to the share sheet (WhatsApp, Google Drive, Files):
 
-**Products CSV (import and export)**
-
-```csv
-name,price,category,sku
-Espresso,2.50,Coffee,ESP-01
-Croissant,3.00,Bakery,
+```json
+{
+  "app": "simplepos",
+  "version": 1,
+  "exported_at": 1795000000000,
+  "menu_items": [ … ],
+  "orders": [ … ],
+  "order_items": [ … ],
+  "settings": [ … ]
+}
 ```
 
-- `price` is given in major units and converted to cents on import.
-- Unknown categories are created automatically.
-- Invalid rows are skipped and listed in an import summary.
-
-**Orders CSV (export):** one row per order item, with the order number, date, status, payment method, item, quantity, unit price, line total and order total.
-
-**Backup:** a copy of the SQLite database file, shared with `expo-sharing`. Restoring validates the schema version before replacing the current database.
+**Restore:** pick the file, check that `app` is `"simplepos"` and that all tables are present, confirm with the user, then replace **all** data in one transaction. IDs are kept, so order numbering continues correctly.
 
 ## 8. Quality
 
-- **Unit tests** (Jest) for everything in `src/lib`, covering money, totals, tax, CSV parsing and formatting.
-- **Database tests** for migrations and queries where practical.
-- **Manual QA checklist** on each milestone: iPhone, Android phone, iPad/tablet, light and dark mode, and a large font size.
-- **Accessibility:** every button has an accessible label, touch targets are at least 44pt, and Dynamic Type is respected.
-- **Performance:** the product grid stays at 60 fps with 500 products (use `FlatList` with stable keys and memoized cells).
+- **Unit tests** (Jest, `npm test`) for the date ranges, summary maths and formatting.
+- **Database tests** run the real SQL in `src/db` against Node's built-in SQLite. They cover migrations, order numbering, edit, delete/undo, menu edits, settings and a backup round-trip.
+- **Manual QA** on a real Android phone and iPhone before each install: see the checklist in [MILESTONES.md](MILESTONES.md#m5-real-phone-trial).
+- **Accessibility:** touch targets of at least 44pt (tiles 112pt tall, status buttons 68pt), white text on dark tile colours, and accessible labels on every button.
 
 ## 9. Risks and open questions
 
 | Risk / question | Mitigation / decision needed |
 | --------------- | ---------------------------- |
-| Data loss if the device is lost | Prompt for a backup weekly, and make backup a single tap |
-| Tax rules vary by country | Support one configurable rate in v1; per-product rates later |
-| Receipt printing (Bluetooth/thermal) | Out of scope for v1. Investigate native modules later (needs a dev build) |
-| Multiple currencies | One currency per shop in v1 |
-| Should voids restore stock? | Yes, if stock tracking is enabled |
-| Order number reset (daily vs. continuous)? | Continuous by default. Revisit if users ask |
+| Data loss if the phone is lost or reset | Export a backup weekly from Settings. Consider a reminder or cloud sync later |
+| Restaurant open past midnight | Late orders count toward the next calendar day. Add a "day ends at" setting if needed |
+| Tapping the wrong status in a rush | The toast after saving has an EDIT button. Status can also be changed from the Orders list |
+| Only one phone can enter orders | Fine for now. Cloud sync is the first "Later" item if a second phone is needed |
+| iPhone install needs an Apple Developer account ($99/yr) | Use Expo Go for testing. Android `.apk` install is free |
+| Pending orders from earlier days are easy to miss | Open question: add an "all pending orders" view across days? |

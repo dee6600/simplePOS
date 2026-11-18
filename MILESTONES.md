@@ -6,150 +6,138 @@ This is the delivery roadmap. Each milestone produces a working, testable app. C
 
 | Milestone | Theme | Status |
 | --------- | ----- | ------ |
-| [M0](#m0-project-foundation) | Project foundation | 🚧 |
-| [M1](#m1-product-catalog) | Product catalog | ⬜ |
-| [M2](#m2-sell--checkout) | Sell & checkout | ⬜ |
-| [M3](#m3-orders--receipts) | Orders & receipts | ⬜ |
-| [M4](#m4-reports) | Reports | ⬜ |
-| [M5](#m5-import-export--backup) | Import, export & backup | ⬜ |
-| [M6](#m6-polish--v10-release) | Polish & v1.0 release | ⬜ |
+| [M0](#m0-project-foundation) | Project foundation | ✅ |
+| [M1](#m1-new-order) | New Order | ✅ |
+| [M2](#m2-orders-list--editing) | Orders list & editing | ✅ |
+| [M3](#m3-summary) | Summary | ✅ |
+| [M4](#m4-settings--backup) | Settings & backup | ✅ |
+| [M5](#m5-real-phone-trial) | Real-phone trial | 🚧 |
+| [M6](#m6-install-on-the-restaurant-phone) | Install on the restaurant phone | ⬜ |
 | [Later](#later-post-v1-ideas) | Post-v1 ideas | ⬜ |
 
 ---
 
 ## M0: Project foundation
 
-**Goal:** set up the app shell, navigation, database and tooling, with nothing user-facing yet.
+**Goal:** app shell, navigation, database and tooling.
 
 - [x] Expo SDK 58 project with TypeScript strict mode
-- [x] Expo Router entry and `@/` path alias
-- [x] Dependencies installed: SQLite, file system, document picker, sharing, haptics
-- [x] Jest configured with `jest-expo`
+- [x] Expo Router with routes in `src/app`
+- [x] Dependencies: SQLite, file system, document picker, sharing, haptics, vector icons, fonts
+- [x] Root `_layout.tsx` with a stack, `SQLiteProvider` and toast provider
+- [x] `(tabs)/_layout.tsx` with New Order, Orders, Summary and Settings tabs
+- [x] Migration runner using `PRAGMA user_version`, initial schema, and the seeded placeholder menu
+- [x] Theme tokens: colours, item tile palette, status colours
+- [x] Jest with `jest-expo`; lint, typecheck and `expo-doctor` all passing
 - [x] README, planning and milestone docs
-- [ ] Root `_layout.tsx` with a stack and `SQLiteProvider`
-- [ ] `(tabs)/_layout.tsx` with Sell, Orders, Products and Reports placeholders
-- [ ] Migration runner using `PRAGMA user_version`, plus the initial schema
-- [ ] `src/lib/money.ts` (parse/format cents) with tests
-- [ ] Theme tokens: colors, spacing, typography
-- [ ] Lint, typecheck and tests passing
-
-**Done when:** the app launches on iOS and Android, all four tabs open, and the database is created on first run.
 
 ---
 
-## M1: Product catalog
+## M1: New Order
 
-**Goal:** the seller can set up their products.
+**Goal:** enter an order in a couple of taps. This is the core of the app.
 
-- [ ] Product list grouped or filtered by category
-- [ ] Add/edit product screen (`product/[id].tsx`) with validation
-- [ ] Delete or archive a product (`is_active = 0`)
-- [ ] Category management: create, rename, color, reorder
-- [ ] Price input that handles locale decimals and stores cents
-- [ ] Empty state with a "Add your first product" call to action
-- [ ] Data-access functions in `src/db/products.ts`
-
-**Done when:** a seller can create 20 products in 4 categories, and they persist after the app restarts.
-
----
-
-## M2: Sell & checkout
-
-**Goal:** take a real sale from start to finish. This is the core of the app.
-
-- [ ] Product grid on the Sell tab with category chips and search
-- [ ] Cart context and reducer: add, increment, decrement, remove, clear
-- [ ] Phone layout: sticky cart bar and cart sheet
-- [ ] Tablet layout: split grid and cart
-- [ ] `src/lib/totals.ts` covering subtotal, discount and tax, with full test coverage
-- [ ] Order-level discount (percentage or fixed)
-- [ ] Checkout modal with cash, card and other payment methods
-- [ ] Cash tendered with quick-amount buttons and change calculation
-- [ ] Save the order and its items in a single transaction
-- [ ] Haptic feedback when adding an item and when a sale succeeds
-- [ ] Success screen with a "New sale" button
-
-**Done when:** a seller can ring up a 3-item cash sale in under 10 seconds, and the order is saved with correct totals.
+- [x] Grid of large coloured item tiles (2 columns on phones, 3–4 on tablets)
+- [x] Tap to add, "−" to remove, quantity badge on each tile
+- [x] Live item count and total, plus a Clear button
+- [x] **Pending · Paid Cash · Paid UPI** buttons that save and clear in one tap
+- [x] Double-tap guard so one tap never saves two orders
+- [x] Order numbers restart at #1 each day
+- [x] Toast "Order #N saved · status · ₹total" with an EDIT button
+- [x] Header shows today's order count and sales
+- [x] Haptic feedback on tap and on save
 
 ---
 
-## M3: Orders & receipts
+## M2: Orders list & editing
 
-**Goal:** review and correct past sales.
+**Goal:** review and correct orders quickly.
 
-- [ ] Orders tab: list grouped by day with daily subtotals
-- [ ] Filter by date and status
-- [ ] Order detail / receipt view (`order/[id].tsx`)
-- [ ] Void an order, with a confirmation prompt
-- [ ] Refund an order (full refund in v1)
-- [ ] Share a receipt as text with `expo-sharing`
-- [ ] Shop name and receipt footer from settings
-
-**Done when:** any past order can be found, viewed, shared and voided, and voided orders are excluded from totals.
+- [x] Orders tab: one day's orders, newest first, with count, total and pending amount
+- [x] All / Pending / Paid filters
+- [x] One-tap "Paid Cash" / "Paid UPI" on pending orders
+- [x] ◀ ▶ to browse earlier days
+- [x] Edit Order screen reusing the New Order editor, with the current status marked
+- [x] Delete with a 6-second UNDO toast (soft delete)
+- [x] Items no longer on the menu still appear in old orders and can be removed
 
 ---
 
-## M4: Reports
+## M3: Summary
 
-**Goal:** answer "how did today go?"
+**Goal:** answer "how did today, this week, this month go?"
 
-- [ ] Today summary: gross sales, order count, average order value
-- [ ] Date-range picker (today, yesterday, last 7 days, this month, custom)
-- [ ] Breakdown by payment method
-- [ ] Top 10 products by quantity and by revenue
-- [ ] Sales-by-hour chart for a single day
-- [ ] Report queries tested against seeded data
-
-**Done when:** report totals match the sum of completed orders for any range.
-
----
-
-## M5: Import, export & backup
-
-**Goal:** get data in and out safely.
-
-- [ ] CSV parser and serializer in `src/lib/csv.ts`, with tests for quoting, commas and newlines
-- [ ] Import products from CSV with `expo-document-picker`, and show an import summary
-- [ ] Export products to CSV
-- [ ] Export orders for a date range to CSV
-- [ ] Back up the database file and share it
-- [ ] Restore from a backup file, with a schema-version check and confirmation
-- [ ] Settings screen: shop name, currency, tax rate and mode, receipt footer
-
-**Done when:** a backup taken on one device restores identically on another.
+- [x] Day / Week (Mon–Sun) / Month switch with ◀ ▶ browsing
+- [x] Total sales, order count and item count
+- [x] Cash, UPI and pending totals with order counts
+- [x] Plates sold per item, with amounts
+- [x] Dine-in / Parcel counts (when the tag is turned on)
+- [x] Day-by-day list for week and month, where tapping a day opens it
+- [x] Share the summary as text (WhatsApp)
+- [x] Unit tests for date ranges and summary maths
 
 ---
 
-## M6: Polish & v1.0 release
+## M4: Settings & backup
 
-**Goal:** make the app ready for the stores.
+**Goal:** let the owner adjust the app and keep the data safe.
 
-- [ ] Onboarding: shop name, currency and optional sample products
-- [ ] Accessibility pass covering labels, contrast, 44pt targets and large text
-- [ ] Performance check with 500 products and 5,000 orders
-- [ ] Error boundaries and friendly error states
-- [ ] App icon, splash screen and store screenshots
-- [ ] `eas.json` with development, preview and production profiles
-- [ ] Internal testing via TestFlight and Play Internal Testing
-- [ ] Privacy policy (no data collected, all data stays on the device)
-- [ ] Submit with `eas submit`
-- [ ] Tag `v1.0.0`
+- [x] Menu editor: name, price, colour, show/hide, add, delete, move up/down
+- [x] Dine-in / Parcel tag toggle (off by default)
+- [x] Restaurant name
+- [x] Export backup (JSON through the share sheet)
+- [x] Restore backup with validation and a confirmation prompt
+- [x] Database tests, including a backup round-trip
 
-**Done when:** the app is live on the App Store and Google Play.
+---
+
+## M5: Real-phone trial
+
+**Goal:** confirm every tap flow works on a real phone. The simulator check so far only covered how screens look with sample data; the taps have not been tried by hand.
+
+- [x] Every screen renders correctly in the iOS Simulator with sample orders, and the totals match hand calculations
+- [ ] Add and remove items on New Order, then save with each of the three status buttons
+- [ ] The EDIT button on the "saved" toast opens the right order
+- [ ] Mark a pending order paid from the Orders list
+- [ ] Edit an order's items and status; delete it, then UNDO
+- [ ] Change a menu price and confirm old orders keep the old price
+- [ ] Add, hide, reorder and delete a menu item
+- [ ] Turn on Dine-in / Parcel and save tagged orders
+- [ ] Share a summary to WhatsApp
+- [ ] Export a backup to WhatsApp or Drive, then restore it
+- [ ] Try it with a large system font size
+- [ ] Test on both an Android phone and an iPhone with Expo Go
+- [ ] Use it for one real service, and note what slows the owner down
+
+**Done when:** a full day of real orders is entered without problems and the end-of-day summary matches the cash box.
+
+---
+
+## M6: Install on the restaurant phone
+
+**Goal:** a permanent install that doesn't need Expo Go or a computer.
+
+- [ ] Restaurant's real menu names and prices entered in Settings
+- [ ] App icon and splash screen (currently the Expo defaults)
+- [x] `eas.json` with an Android `preview` profile that builds an `.apk`
+- [ ] Build the APK with `npx eas-cli@latest build -p android --profile preview` and install it
+- [ ] iPhone (if needed): Apple Developer account, then TestFlight
+- [ ] Agree a weekly backup routine
+
+**Done when:** the app is installed on the restaurant phone and used daily.
 
 ---
 
 ## Later: post-v1 ideas
 
-These aren't scheduled. Reprioritize them based on user feedback.
+These aren't scheduled. Reprioritize them based on how the restaurant uses the app.
 
-- Stock tracking with low-stock alerts
-- Barcode scanning (`expo-camera`)
-- Product variants and modifiers (size, milk, extras)
-- Per-product tax rates
-- Partial refunds and split payments
-- PDF receipts and Bluetooth thermal printing
-- Dark theme
-- Customer records and tips
-- Multi-device sync (optional cloud backend)
-- Localization (i18n)
+- Cloud sync so more than one phone can enter or view orders
+- "All pending orders" view across days
+- Bill printing, or sharing a bill with the customer
+- Customer name or table note on an order
+- "Business day ends at" setting for closing after midnight
+- Weekly backup reminder
+- Sales charts (by day, by hour)
+- CSV export for accounting
+- Hindi / Telugu labels
