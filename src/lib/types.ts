@@ -1,4 +1,7 @@
+/** How an order was paid. 'pending' only appears on orders saved by app versions before 1.3. */
 export type Status = 'pending' | 'cash' | 'upi';
+/** The choices the app offers when saving an order (v1.3 removed Pending). */
+export type PaidStatus = 'cash' | 'upi';
 export type OrderType = 'dine_in' | 'parcel' | null;
 
 export type MenuItem = {

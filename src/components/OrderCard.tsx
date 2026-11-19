@@ -12,13 +12,13 @@ type Props = {
 };
 
 export function OrderCard({ order, onPress, onMarkPaid }: Props) {
-  const pending = order.status === 'pending';
+  const unpaid = order.status === 'pending'; // only old orders from before v1.3
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityHint="Opens the order to edit or delete"
-      style={({ pressed }) => [styles.card, pending && styles.pendingCard, pressed && { opacity: 0.85 }]}
+      style={({ pressed }) => [styles.card, unpaid && styles.unpaidCard, pressed && { opacity: 0.85 }]}
     >
       <View style={styles.row}>
         <Text style={styles.no}>#{order.order_no}</Text>
@@ -42,7 +42,7 @@ export function OrderCard({ order, onPress, onMarkPaid }: Props) {
       </Text>
 
       <View style={styles.row}>
-        {pending && (
+        {unpaid && (
           <>
             {(['cash', 'upi'] as const).map((s) => (
               <Pressable
@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  pendingCard: { borderColor: STATUS.pending.color, borderWidth: 2 },
+  unpaidCard: { borderColor: STATUS.pending.color, borderWidth: 2 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   spacer: { flex: 1 },
   no: { fontSize: 20, fontWeight: '900', color: colors.text },

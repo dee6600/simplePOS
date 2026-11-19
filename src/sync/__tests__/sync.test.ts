@@ -118,7 +118,7 @@ test('shop phone uploads; family phone joins and sees everything, live', async (
   expect([oil.category, oil.created_by, oil.updated_by]).toEqual(['Oil', 'Dad', 'Dad']); // who spent it travels too
 
   // Live: a new order at the shop shows up on Mom's phone.
-  const { id } = await createOrder(shop.db, { lines: [await lineFor(shop.db, 0, 1)], status: 'pending', orderType: null });
+  const { id } = await createOrder(shop.db, { lines: [await lineFor(shop.db, 0, 1)], status: 'cash', orderType: null });
   shop.engine.schedulePush();
   await settle(shop, mom);
   expect((await listOrders(mom.db, ALL)).map((o) => o.order_no)).toEqual([2, 1]);
@@ -154,7 +154,7 @@ test('the newest edit wins when two phones change the same order', async () => {
   const a = await phone(cloud, 'Dad');
   await prepareCreate(a.db, 'shop1', 'e');
   await a.engine.start();
-  const { id } = await createOrder(a.db, { lines: [await lineFor(a.db, 0, 1)], status: 'pending', orderType: null });
+  const { id } = await createOrder(a.db, { lines: [await lineFor(a.db, 0, 1)], status: 'cash', orderType: null });
   a.engine.schedulePush();
   const b = await phone(cloud, 'Brother');
   await prepareJoin(b.db, 'shop1', 'e', false);

@@ -165,11 +165,23 @@ This is the delivery roadmap. Each milestone produces a working, testable app. C
 
 ---
 
+## v1.3: No Pending, profit with lump sums, online updates
+
+- [x] Pending removed: New Order has two big buttons, **Paid Cash** and **Paid UPI**; no Pending filter on Orders, no Pending card in Summary or line in the shared text, no "to collect" on the Money tab
+- [x] Old Pending orders (from v1.2 phones) show as **Not paid** with Cash / UPI buttons; they count in total sales, not in the balance
+- [x] Profit = sales + money added − expenses (money taken out is a withdrawal, not a cost)
+- [x] Online updates with `expo-updates` / EAS Update: `npm run publish-update -- "message"` (checks the Firebase settings are inside before publishing), `preview` channel, fixed `runtimeVersion` "1"
+- [x] Settings: **Check for app update**; Family sync lists which app version each phone is on (`shops/main/devices`)
+- [x] Works alongside v1.2 phones (same data format and rules); emulator test covers the version list and the rules
+- [x] Version 1.3.0 (Android versionCode 3, iOS buildNumber 3); installed on Dee's and Shree's iPhones
+- [ ] Install the 1.3.0 APK on the Android phones (last cable/APK install; after that, updates arrive online)
+
+---
+
 ## Later: post-v1 ideas
 
 These aren't scheduled. Reprioritize them based on how the restaurant uses the app.
 
-- "All pending orders" view across days
 - Bill printing, or sharing a bill with the customer
 - Customer name or table note on an order
 - "Business day ends at" setting for closing after midnight

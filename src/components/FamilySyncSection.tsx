@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { formatDayShort } from '../lib/dates';
 import { formatTime } from '../lib/format';
+import type { DeviceInfo } from '../sync/devices';
 import type { ConnectMode } from '../sync/connectShop';
 import { formatPhone } from '../sync/shopLogin';
 import { useSync } from '../sync/SyncProvider';
@@ -18,6 +20,18 @@ export function FamilySyncSection() {
   const [name, setName] = useState(sync.userName ?? '');
   const [phone, setPhone] = useState('');
   const [busy, setBusy] = useState(false);
+  const [phones, setPhones] = useState<DeviceInfo[] | null>(null);
+  const [loadingPhones, setLoadingPhones] = useState(false);
+
+  const showPhones = async () => {
+    setLoadingPhones(true);
+    try {
+      setPhones(await sync.listPhones());
+    } catch (e) {
+      Alert.alert('Could not load the family phones', e instanceof Error ? e.message : String(e));
+    }
+    setLoadingPhones(false);
+  };
 
   const saveName = async () => {
     if (!name.trim()) return;
@@ -124,6 +138,16 @@ export function FamilySyncSection() {
                   <Text style={[styles.bigBtnText, { color: colors.text }]}>Sign out</Text>
                 </Pressable>
               </View>
+              <Pressable onPress={showPhones} disabled={loadingPhones} style={[styles.bigBtn, styles.outline, { flex: 0 }]}>
+                {loadingPhones ? (
+                  <ActivityIndicator color={colors.primary} />
+                ) : (
+                  <Text style={[styles.bigBtnText, { color: colors.primary }]}>
+                    {phones ? 'Refresh app versions' : 'Which app version is each phone on?'}
+                  </Text>
+                )}
+              </Pressable>
+              {phones && <PhoneVersions phones={phones} />}
             </>
           ) : (
             <>
@@ -147,6 +171,45 @@ export function FamilySyncSection() {
   );
 }
 
+/** Newest = highest app version, then the newest online update. */
+function versionKey(p: DeviceInfo): string {
+  const v = p.app_version.split('.').map((n) => n.padStart(4, '0')).join('.');
+  return `${v}|${String(p.update_created_at ?? 0).padStart(15, '0')}`;
+}
+
+function PhoneVersions({ phones }: { phones: DeviceInfo[] }) {
+  const latest = phones.reduce((max, p) => (versionKey(p) > max ? versionKey(p) : max), '');
+  const when = (ms: number) => `${formatDayShort(new Date(ms))} ${formatTime(ms)}`;
+  return (
+    <View style={{ gap: 8 }}>
+      {phones.map((p) => {
+        const upToDate = versionKey(p) === latest;
+        return (
+          <View key={p.device_id} style={styles.phoneRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.phoneName}>
+                {p.user_name || 'No name'} · {p.platform === 'ios' ? 'iPhone' : p.platform === 'android' ? 'Android' : p.platform}
+              </Text>
+              <Text style={styles.hint}>
+                v{p.app_version}
+                {p.update_created_at ? ` · update of ${when(p.update_created_at)}` : ' · as installed'}
+                {p.seen_at ? ` · seen ${when(p.seen_at)}` : ''}
+              </Text>
+            </View>
+            <Text style={[styles.phoneTag, { color: upToDate ? '#15803D' : colors.danger }]}>
+              {upToDate ? 'Latest' : 'Needs update'}
+            </Text>
+          </View>
+        );
+      })}
+      <Text style={styles.hint}>
+        A phone shows here once it opens v1.3 or newer. Phones still on v1.2 keep working and syncing, but need the new
+        APK / iPhone build installed once before they can update online.
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   section: { gap: 6 },
   sectionTitle: { fontSize: 18, fontWeight: '900', color: colors.text },
@@ -164,4 +227,7 @@ const styles = StyleSheet.create({
   outline: { backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border },
   bigBtn: { flex: 1, height: 52, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
   bigBtnText: { color: colors.white, fontSize: 16, fontWeight: '800' },
+  phoneRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4, borderTopWidth: 1, borderTopColor: colors.border },
+  phoneName: { fontSize: 16, fontWeight: '800', color: colors.text },
+  phoneTag: { fontSize: 14, fontWeight: '800' },
 });

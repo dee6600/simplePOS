@@ -49,21 +49,21 @@ test('create, list, edit, mark paid, delete and undo', async () => {
   const { db, line } = await setup();
 
   const a = await createOrder(db, { lines: [line(1, 2), line(5, 1)], status: 'cash', orderType: null });
-  const b = await createOrder(db, { lines: [line(4, 1)], status: 'pending', orderType: 'parcel' });
+  const b = await createOrder(db, { lines: [line(4, 1)], status: 'cash', orderType: 'parcel' });
   expect([a.orderNo, b.orderNo]).toEqual([1, 2]);
 
   let orders = await listOrders(db, today());
   expect(orders.map((o) => o.order_no)).toEqual([2, 1]); // newest first
   expect(orders[1]).toMatchObject({ status: 'cash', total: 2 * 200 + 20, order_type: null });
   expect(orders[1].items).toEqual([line(1, 2), line(5, 1)]);
-  expect(orders[0]).toMatchObject({ status: 'pending', order_type: 'parcel', total: 150 });
+  expect(orders[0]).toMatchObject({ status: 'cash', order_type: 'parcel', total: 150 });
 
   await setOrderStatus(db, b.id, 'upi');
   expect((await getOrder(db, b.id))?.status).toBe('upi');
 
-  await updateOrder(db, a.id, { lines: [line(0, 3)], status: 'pending', orderType: 'dine_in' });
+  await updateOrder(db, a.id, { lines: [line(0, 3)], status: 'upi', orderType: 'dine_in' });
   const edited = await getOrder(db, a.id);
-  expect(edited).toMatchObject({ status: 'pending', order_type: 'dine_in', total: 360, order_no: 1 });
+  expect(edited).toMatchObject({ status: 'upi', order_type: 'dine_in', total: 360, order_no: 1 });
   expect(edited?.items).toEqual([line(0, 3)]);
 
   await setOrderDeleted(db, b.id, true);

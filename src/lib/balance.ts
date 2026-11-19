@@ -1,8 +1,6 @@
 export type BalanceSums = {
   cashSales: number;
   upiSales: number;
-  pending: number;
-  pendingCount: number;
   cashIn: number;
   cashOut: number;
   cashExpenses: number;
@@ -17,9 +15,6 @@ export type Balance = {
   /** Money in the bank account (UPI payments land here). */
   bank: number;
   total: number;
-  /** Pending orders: not in the balance until paid. */
-  toCollect: number;
-  toCollectCount: number;
 };
 
 /**
@@ -29,7 +24,7 @@ export type Balance = {
 export function computeBalance(s: BalanceSums): Balance {
   const cash = s.cashSales + s.cashIn - s.cashOut - s.cashExpenses;
   const bank = s.upiSales + s.bankIn - s.bankOut - s.bankExpenses;
-  return { cash, bank, total: cash + bank, toCollect: s.pending, toCollectCount: s.pendingCount };
+  return { cash, bank, total: cash + bank };
 }
 
 /** Preset expense categories (the note field covers anything else). */

@@ -95,12 +95,6 @@ export default function MoneyScreen() {
               <Text style={styles.totalLabel}>Total</Text>
               <Text style={styles.totalValue}>{formatRupees(balance.total)}</Text>
             </View>
-            {balance.toCollectCount > 0 && (
-              <Text style={styles.toCollect}>
-                + {formatRupees(balance.toCollect)} still to collect ({balance.toCollectCount} pending order
-                {balance.toCollectCount === 1 ? '' : 's'})
-              </Text>
-            )}
           </View>
         )}
 
@@ -208,7 +202,6 @@ const styles = StyleSheet.create({
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   totalLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 16, fontWeight: '700' },
   totalValue: { color: colors.white, fontSize: 30, fontWeight: '900' },
-  toCollect: { color: '#FDE68A', fontSize: 14, fontWeight: '700' },
   actions: { flexDirection: 'row', gap: 8 },
   actionBtn: { flex: 1, height: 72, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', gap: 2, paddingHorizontal: 4 },
   actionText: { color: colors.white, fontSize: 16, fontWeight: '800' },

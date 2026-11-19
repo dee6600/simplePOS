@@ -1,6 +1,6 @@
 import { formatRupees, formatTime } from '../format';
-import { summarize } from '../summary';
-import type { Order, OrderLine } from '../types';
+import { summarize, summaryText } from '../summary';
+import type { MoneyEntry, Order, OrderLine } from '../types';
 
 let nextId = 1;
 function order(partial: Partial<Order> & { items: OrderLine[] }): Order {
@@ -12,7 +12,7 @@ function order(partial: Partial<Order> & { items: OrderLine[] }): Order {
     order_no: 1,
     created_at: new Date(2026, 10, 18, 13).getTime(),
     updated_at: 0,
-    status: 'pending',
+    status: 'cash',
     order_type: null,
     total,
     deleted: 0,
@@ -24,18 +24,17 @@ const chickenFull = (qty: number, price = 200): OrderLine => ({ menu_item_id: 2,
 const water = (qty: number): OrderLine => ({ menu_item_id: 6, name: 'Water Bottle', price: 20, qty });
 
 describe('summarize', () => {
-  it('splits cash / upi / pending and ignores deleted orders', () => {
+  it('splits cash / upi, counts old unpaid orders in sales only, and ignores deleted orders', () => {
     const s = summarize([
       order({ status: 'cash', items: [chickenFull(2)] }), // 400
       order({ status: 'upi', items: [chickenFull(1), water(2)] }), // 240
-      order({ status: 'pending', items: [water(1)] }), // 20
+      order({ status: 'pending', items: [water(1)] }), // 20, saved before v1.3
       order({ status: 'cash', deleted: 1, items: [chickenFull(10)] }),
     ]);
     expect(s.orderCount).toBe(3);
     expect(s.total).toBe(660);
     expect([s.cash, s.cashCount]).toEqual([400, 1]);
     expect([s.upi, s.upiCount]).toEqual([240, 1]);
-    expect([s.pending, s.pendingCount]).toEqual([20, 1]);
     expect(s.itemCount).toBe(6);
   });
 
@@ -66,6 +65,23 @@ describe('summarize', () => {
       ['2026-11-18', 2, 60],
       ['2026-11-16', 1, 20],
     ]);
+  });
+
+  it('counts money added as profit, but not money taken out', () => {
+    const entry = (kind: MoneyEntry['kind'], amount: number): MoneyEntry => ({
+      id: nextId, uid: `m${nextId++}`, kind, amount, method: 'cash', category: kind === 'expense' ? 'Oil' : null,
+      note: '', created_at: new Date(2026, 10, 18, 9).getTime(), updated_at: 0, deleted: 0,
+      created_by: 'Dad', updated_by: 'Dad',
+    });
+    const s = summarize(
+      [order({ items: [chickenFull(2)] })], // 400 sales
+      [],
+      [entry('in', 1000), entry('out', 300), entry('expense', 250), { ...entry('in', 99), deleted: 1 }],
+    );
+    expect([s.total, s.moneyIn, s.moneyOut, s.expenses, s.profit]).toEqual([400, 1000, 300, 250, 400 + 1000 - 250]);
+    const text = summaryText(s, { restaurantName: 'Shop', periodLabel: 'Today', showOrderType: false, showDays: false });
+    expect(text).toContain('Profit (sales + money added − expenses): ₹1,150');
+    expect(text).not.toMatch(/pending/i);
   });
 
   it('handles no orders', () => {

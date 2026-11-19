@@ -16,10 +16,14 @@ import { createOrder, listOrders, setOrderStatus } from '../../db/orders';
 import { getDeviceSetting, getSettings, saveSetting, setDeviceSetting } from '../../db/settings';
 import { openTestDb } from '../../test/nodeSqlite';
 import { connectShop } from '../connectShop';
+import { listFamilyPhones, reportThisPhone } from '../devices';
 import { SyncEngine } from '../engine';
 import { FirestoreRemote } from '../firestoreRemote';
 import { SHOP_ID } from '../shopLogin';
 
+jest.mock('expo-constants', () => ({ __esModule: true, default: { expoConfig: { version: '1.3.0' } } }));
+jest.mock('expo-updates', () => ({ isEmbeddedLaunch: true, updateId: null, createdAt: null, runtimeVersion: '1' }));
+jest.mock('react-native', () => ({ Platform: { OS: 'android' } }));
 jest.mock('expo-crypto', () => ({ randomUUID: () => jest.requireActual('node:crypto').randomUUID() }));
 jest.setTimeout(60_000);
 
@@ -127,6 +131,17 @@ afterAll(async () => {
   await setOrderStatus(momDb, (await listOrders(momDb, ALL))[0].id, 'upi');
   momEngine.schedulePush();
   await waitFor(async () => (await listOrders(dadDb, ALL))[0].status === 'upi', 'status change → Dad');
+
+  // Each phone reports its app version; family members can list them, strangers can't.
+  await reportThisPhone(dad.fs, SHOP_ID, 'dad-phone', 'Dad');
+  await reportThisPhone(mom.fs, SHOP_ID, 'mom-phone', 'Mom');
+  const phones = await listFamilyPhones(mom.fs, SHOP_ID);
+  expect(phones.map((p) => [p.user_name, p.app_version, p.platform, p.update_id]).sort()).toEqual([
+    ['Dad', '1.3.0', 'android', ''],
+    ['Mom', '1.3.0', 'android', ''],
+  ]);
+  expect(phones.every((p) => typeof p.seen_at === 'number')).toBe(true);
+  await expect(listFamilyPhones(stranger.fs, SHOP_ID)).rejects.toMatchObject({ code: 'permission-denied' });
 
   // Signing in again with the same number works (e.g. after reinstalling).
   const dad2 = phoneApp('dad-reinstall');

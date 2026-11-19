@@ -1,12 +1,12 @@
 # SimplePOS
 
-A small, fast point-of-sale app for a biryani restaurant, for Android and iPhone (Expo / React Native). Version 1.2.
+A small, fast point-of-sale app for a biryani restaurant, for Android and iPhone (Expo / React Native). Version 1.3.
 
-- **New Order**: tap item tiles to add (tap **−** to remove), then tap **Pending**, **Paid Cash** or **Paid UPI** to save.
-- **Orders**: the day's orders, each showing who made it. Mark pending orders paid in one tap, and tap an order to edit or delete it (with Undo). Use ◀ ▶ to see earlier days.
-- **Money**: the running balance (**Cash in hand**, **Bank**, **Total**, plus pending orders still to collect). Record **Expenses** (Rice, Chicken, Oil, Gas, Salary, …), **Add money** (e.g. the opening balance) and **Take out**, each as Cash or Bank/UPI. Tap an entry to edit or delete it (with Undo).
-- **Summary**: Day / Week / Month sales, cash vs UPI vs pending, plates sold per item, expenses by category, profit (sales − expenses), lump sums and the balance now. Tap **Share** to send it on WhatsApp.
-- **Settings**: this phone's user name and phone number, family sync (status, Sync now, Sign out), menu names, prices, colours and order, the optional Dine-in / Parcel tag, and backup export / restore.
+- **New Order**: tap item tiles to add (tap **−** to remove), then tap **Paid Cash** or **Paid UPI** to save. (v1.3 removed Pending: every order is paid when it's saved.)
+- **Orders**: the day's orders, each showing who made it. Tap an order to edit or delete it (with Undo). Use ◀ ▶ to see earlier days.
+- **Money**: the running balance (**Cash in hand**, **Bank**, **Total**). Record **Expenses** (Rice, Chicken, Oil, Gas, Salary, …), **Add money** (e.g. the opening balance) and **Take out**, each as Cash or Bank/UPI. Tap an entry to edit or delete it (with Undo).
+- **Summary**: Day / Week / Month sales, cash vs UPI, plates sold per item, expenses by category, profit (sales + money added − expenses; money taken out doesn't reduce profit), lump sums and the balance now. Tap **Share** to send it on WhatsApp.
+- **Settings**: this phone's user name and phone number, family sync (status, Sync now, Sign out, which app version each phone is on), **Check for app update**, menu names, prices, colours and order, the optional Dine-in / Parcel tag, and backup export / restore.
 
 Each phone shows a one-time **Welcome** screen: the person's own phone number (when family sync is set up) and who they are (Mom, Dad, Shree, Dee, or a typed name). Orders record who made them; expenses and lump sums record who added them and who last edited them.
 
@@ -29,7 +29,7 @@ npx expo start        # dev server (Expo Go or a development build)
 npx expo start --ios  # or open it in the iOS Simulator
 ```
 
-v1.2 adds native modules (`@react-native-async-storage/async-storage`, `expo-crypto`), so phones with an installed v1.0 app need a new build (see below), not just an update from Expo Go.
+v1.3 adds `expo-updates` (online updates, below). Like v1.2's native modules, it only reaches a phone through a new build, not through Expo Go.
 
 ## Checks
 
@@ -41,7 +41,7 @@ npm run lint
 ```
 
 - The real-data test uses `data/simplepos-backup-2026-11-18.json`. `data/` is gitignored (business data), so the test is skipped when the file isn't there.
-- `npm test` currently shows 31 passed and 1 skipped (the emulator test, which only runs under `npm run test:emulator`).
+- `npm test` currently shows 33 passed and 1 skipped (the emulator test, which only runs under `npm run test:emulator`).
 - The two-phone sync tests in `npm test` use an in-memory cloud. `npm run test:emulator` runs the real phone-number login and sync code against a local Firebase Auth + Firestore emulator, including `firestore.rules`: Dad's number creates the shop, Mom's number joins the same shop, changes sync live both ways with who did them, signing in again with the same number returns the same login, a phone with its own orders is asked what to do, a number not on the family list is refused ("not on the family list"), nobody can read `members`, and signed-out visitors are blocked. It needs Java 21, e.g. Android Studio's bundled JDK:
 
   ```bash
@@ -61,7 +61,7 @@ xcodebuild -workspace ios/SimplePOS.xcworkspace -scheme SimplePOS -configuration
 xcrun devicectl device install app --device <UDID> ios/build/Build/Products/Release-iphoneos/SimplePOS.app
 ```
 
-**Android** (free) builds an `.apk` you install on the phone:
+**Android** (free) builds an `.apk` you install on the phone. Gradle needs Java 17+ and the Android SDK; use Android Studio's (`export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ANDROID_HOME="$HOME/Library/Android/sdk"`):
 
 ```bash
 npx eas-cli build -p android --profile preview --local   # build on this computer
@@ -72,7 +72,26 @@ Both use the same Expo-managed signing key, so a local build installs as an upda
 
 **GitHub releases:** an `.apk` or `.app` built with `.env.local` contains the family's Firebase settings. Don't attach it to a GitHub release unless the repository is private; share it with the family directly instead.
 
-Version: 1.2.0 (Android versionCode 2, iOS buildNumber 2), set in `app.json`. Bump both build numbers for each new release.
+Version: 1.3.0 (Android versionCode 3, iOS buildNumber 3, runtimeVersion 1), set in `app.json`. Bump both build numbers for each new build; online updates don't need a new number.
+
+## Online updates (v1.3+)
+
+Phones running a v1.3 build (or newer) update themselves over the internet with **EAS Update** (free plan: up to 1,000 phones a month). No cable, no APK.
+
+```bash
+npm run publish-update -- "Fixed the summary total"
+```
+
+The script runs the tests and typecheck and builds the update on this Mac, where `.env.local` is loaded. It checks that the Firebase settings made it into both bundles, then publishes to the `preview` channel, which the APK and the iPhone builds listen to. If the settings are missing it stops without publishing, because an update without them would switch sync off on every phone.
+
+Each phone downloads the update in the background when the app opens and switches to it the **next** time the app is opened. **Settings → Check for app update** downloads it and restarts right away. **Settings → Family sync → Which app version is each phone on?** lists each phone's version and marks the ones that need an update.
+
+What can and can't go out online:
+
+- **Online:** screens, wording, calculations, anything in `src/`.
+- **Needs a new APK / iPhone build:** a new library with native code, or native settings in `app.json` (icon, name, permissions). For that build, raise `"runtimeVersion"` in `app.json` (now `"1"`). Phones still on the old build keep running their version and never receive an update they can't run.
+- **Older phones keep working:** an update reaches phones at different times, and v1.2 phones can't update online at all. So the synced data must stay readable by older versions: add fields, but never rename or remove them, and don't change `firestore.rules` in a way that blocks an older version. v1.2 and v1.3 phones sync together fine. A v1.2 phone can still save a Pending order; v1.3 shows it as **Not paid**, with Cash / UPI buttons to settle it.
+- The iPhone free-team install still expires after 7 days, whatever the online updates; reinstall it from this Mac.
 
 ## Code layout
 

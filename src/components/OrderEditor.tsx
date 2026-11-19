@@ -5,7 +5,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, Vi
 
 import type { OrderInput } from '../db/orders';
 import { formatRupees, linesCount, linesTotal } from '../lib/format';
-import type { MenuItem, Order, OrderLine, OrderType, Status } from '../lib/types';
+import type { MenuItem, Order, OrderLine, OrderType, PaidStatus } from '../lib/types';
 import { colors, ITEM_COLORS, radius, STATUS } from '../theme';
 import { ItemTile } from './ItemTile';
 import { Segmented } from './Segmented';
@@ -25,7 +25,6 @@ type Props = {
 };
 
 const STATUS_ICONS = {
-  pending: 'time-outline',
   cash: 'cash-outline',
   upi: 'qr-code-outline',
 } as const;
@@ -91,7 +90,7 @@ export function OrderEditor({ menu, showOrderType, initial, bottomInset = 0, onS
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, qty: l.qty - 1 } : l)).filter((l) => l.qty > 0));
   };
 
-  const submit = async (status: Status) => {
+  const submit = async (status: PaidStatus) => {
     if (savingRef.current || count === 0) return;
     savingRef.current = true;
     setSaving(true);
@@ -174,7 +173,7 @@ export function OrderEditor({ menu, showOrderType, initial, bottomInset = 0, onS
 
         {isEdit && <Text style={styles.saveAs}>Save as</Text>}
         <View style={styles.buttons}>
-          {(['pending', 'cash', 'upi'] as const).map((s) => {
+          {(['cash', 'upi'] as const).map((s) => {
             const disabled = count === 0 || saving;
             const current = isEdit && initial?.status === s;
             return (
@@ -191,7 +190,7 @@ export function OrderEditor({ menu, showOrderType, initial, bottomInset = 0, onS
                   pressed && { opacity: 0.8 },
                 ]}
               >
-                <Ionicons name={current ? 'checkmark-circle' : STATUS_ICONS[s]} size={24} color={colors.white} />
+                <Ionicons name={current ? 'checkmark-circle' : STATUS_ICONS[s]} size={26} color={colors.white} />
                 <Text style={styles.statusText} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.2}>
                   {STATUS[s].button}
                 </Text>
@@ -238,7 +237,7 @@ const styles = StyleSheet.create({
   buttons: { flexDirection: 'row', gap: 8 },
   statusBtn: {
     flex: 1,
-    height: 68,
+    height: 72,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
@@ -246,5 +245,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   currentBtn: { borderWidth: 3, borderColor: colors.text },
-  statusText: { color: colors.white, fontSize: 17, fontWeight: '800' },
+  statusText: { color: colors.white, fontSize: 19, fontWeight: '800' },
 });

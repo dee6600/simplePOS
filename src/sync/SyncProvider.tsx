@@ -1,5 +1,5 @@
 import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 
@@ -8,6 +8,7 @@ import { emitDataChanged, useDataChanged } from '../lib/events';
 import { isFirebaseConfigured } from './config';
 import { prepareDisconnect } from './connect';
 import { connectShop, friendlyMessage, type ConnectMode, type ConnectResult } from './connectShop';
+import { listFamilyPhones, reportThisPhone, type DeviceInfo } from './devices';
 import { SyncEngine, type SyncStatus } from './engine';
 import { getFirebase } from './firebase';
 import { FirestoreRemote } from './firestoreRemote';
@@ -27,6 +28,8 @@ type SyncContextValue = {
   connect: (phone: string, mode: ConnectMode) => Promise<ConnectResult>;
   signOut: () => Promise<void>;
   syncNow: () => void;
+  /** Which app version each family phone (v1.3+) runs. */
+  listPhones: () => Promise<DeviceInfo[]>;
 };
 
 const OFF: SyncStatus = { state: 'off', waiting: 0, lastSyncedAt: null, error: null };
@@ -66,6 +69,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       engineRef.current = engine;
       setConnected(true);
       engine.start().catch(() => {});
+      reportPhone(db, shopId);
     },
     [db],
   );
@@ -111,6 +115,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       const trimmed = name.trim();
       await setDeviceSetting(db, 'user_name', trimmed);
       setUserNameState(trimmed);
+      if (engineRef.current) reportPhone(db, SHOP_ID);
     },
     [db],
   );
@@ -153,13 +158,29 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     engineRef.current?.pushNow();
   }, []);
 
+  const listPhones = useCallback(async () => {
+    const fb = getFirebase();
+    return fb ? listFamilyPhones(fb.firestore, SHOP_ID) : [];
+  }, []);
+
   if (!loaded) return null;
 
   return (
     <SyncContext.Provider
-      value={{ configured, connected, myPhone, status, userName, setUserName, connect, signOut, syncNow }}
+      value={{ configured, connected, myPhone, status, userName, setUserName, connect, signOut, syncNow, listPhones }}
     >
       {children}
     </SyncContext.Provider>
   );
+}
+
+/** Records this phone's app version in the shop (best effort: it retries the next time sync starts). */
+function reportPhone(db: SQLiteDatabase, shopId: string) {
+  const fb = getFirebase();
+  if (!fb) return;
+  (async () => {
+    const deviceId = await getDeviceSetting(db, 'device_id');
+    const userName = await getDeviceSetting(db, 'user_name');
+    if (deviceId) await reportThisPhone(fb.firestore, shopId, deviceId, userName ?? '');
+  })().catch(() => {});
 }

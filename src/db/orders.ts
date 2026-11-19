@@ -2,7 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { periodRange, type Range } from '../lib/dates';
 import { linesTotal } from '../lib/format';
-import type { Order, OrderLine, OrderType, Status } from '../lib/types';
+import type { Order, OrderLine, OrderType, PaidStatus } from '../lib/types';
 import { newUid } from '../lib/uid';
 import { CURRENT_USER_SQL } from './settings';
 import { withTx } from './tx';
@@ -14,7 +14,7 @@ const ORDER_COLUMNS = 'id, uid, order_no, created_at, updated_at, status, order_
 
 export type OrderInput = {
   lines: OrderLine[];
-  status: Status;
+  status: PaidStatus;
   orderType: OrderType;
 };
 
@@ -63,7 +63,7 @@ export async function updateOrder(db: SQLiteDatabase, id: number, input: OrderIn
   });
 }
 
-export async function setOrderStatus(db: SQLiteDatabase, id: number, status: Status): Promise<void> {
+export async function setOrderStatus(db: SQLiteDatabase, id: number, status: PaidStatus): Promise<void> {
   await db.runAsync('UPDATE orders SET status = ?, updated_at = ?, dirty = 1 WHERE id = ?', status, Date.now(), id);
 }
 

@@ -1,10 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import Constants from 'expo-constants';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
+import { AppVersion } from '../../components/AppVersion';
 import { FamilySyncSection } from '../../components/FamilySyncSection';
 import { MenuItemModal } from '../../components/MenuItemModal';
 import { ScreenHeader } from '../../components/ScreenHeader';
@@ -192,7 +192,7 @@ export default function SettingsScreen() {
           </Pressable>
         </Section>
 
-        <Text style={styles.version}>SimplePOS v{Constants.expoConfig?.version ?? '1.0.0'}</Text>
+        <AppVersion />
       </ScrollView>
 
       <MenuItemModal
@@ -301,5 +301,4 @@ const styles = StyleSheet.create({
   },
   outlineBtn: { backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border },
   bigBtnText: { color: colors.white, fontSize: 17, fontWeight: '800' },
-  version: { textAlign: 'center', color: colors.muted, fontSize: 13 },
 });

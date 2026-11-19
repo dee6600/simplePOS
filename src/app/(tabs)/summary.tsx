@@ -121,13 +121,12 @@ export default function SummaryScreen() {
             <View style={styles.statRow}>
               <Stat label="Cash" value={s.cash} count={s.cashCount} color={STATUS.cash.color} bg={STATUS.cash.bg} />
               <Stat label="UPI" value={s.upi} count={s.upiCount} color={STATUS.upi.color} bg={STATUS.upi.bg} />
-              <Stat label="Pending" value={s.pending} count={s.pendingCount} color={STATUS.pending.color} bg={STATUS.pending.bg} />
             </View>
 
             <View style={styles.statRow}>
               <Stat label="Expenses" value={s.expenses} count={s.expenseCount} color="#B91C1C" bg="#FEE2E2" unit="entry" />
               <View style={[styles.stat, styles.profit]}>
-                <Text style={[styles.statLabel, { color: colors.white }]}>Profit (sales − expenses)</Text>
+                <Text style={[styles.statLabel, { color: colors.white }]}>Profit (sales + added − expenses)</Text>
                 <Text style={[styles.statValue, { color: s.profit < 0 ? '#FCA5A5' : colors.white }]} numberOfLines={1} adjustsFontSizeToFit>
                   {formatRupees(s.profit)}
                 </Text>
@@ -195,7 +194,7 @@ export default function SummaryScreen() {
                   <Text style={styles.itemName}>Money taken out</Text>
                   <Text style={styles.itemAmount}>−{formatRupees(s.moneyOut)}</Text>
                 </View>
-                <Text style={styles.muted}>Not counted in profit. See the Money tab for who added each one.</Text>
+                <Text style={styles.muted}>Money added counts as profit; money taken out does not. See the Money tab for who added each one.</Text>
               </View>
             )}
 

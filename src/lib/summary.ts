@@ -14,8 +14,6 @@ export type Summary = {
   cashCount: number;
   upi: number;
   upiCount: number;
-  pending: number;
-  pendingCount: number;
   itemCount: number;
   items: ItemTotal[];
   dineIn: number;
@@ -25,9 +23,9 @@ export type Summary = {
   expenses: number;
   expenseCount: number;
   expensesByCategory: CategoryTotal[];
-  /** Sales − expenses (pending orders count as sales). */
+  /** Sales + money added − expenses. Money taken out is not counted (it is a withdrawal, not a cost). */
   profit: number;
-  /** Lump sums added to / taken out of the balance (not part of profit). */
+  /** Lump sums added to / taken out of the balance. Money added counts as profit. */
   moneyIn: number;
   moneyOut: number;
   /** Days that have at least one order or expense, newest first. */
@@ -42,7 +40,7 @@ export type Summary = {
 export function summarize(orders: Order[], menuOrder: number[] = [], entries: MoneyEntry[] = []): Summary {
   const s: Summary = {
     orderCount: 0, total: 0,
-    cash: 0, cashCount: 0, upi: 0, upiCount: 0, pending: 0, pendingCount: 0,
+    cash: 0, cashCount: 0, upi: 0, upiCount: 0,
     itemCount: 0, items: [], dineIn: 0, parcel: 0, untagged: 0,
     expenses: 0, expenseCount: 0, expensesByCategory: [], profit: 0, moneyIn: 0, moneyOut: 0,
     days: [],
@@ -65,7 +63,7 @@ export function summarize(orders: Order[], menuOrder: number[] = [], entries: Mo
     s.total += o.total;
     if (o.status === 'cash') { s.cash += o.total; s.cashCount += 1; }
     else if (o.status === 'upi') { s.upi += o.total; s.upiCount += 1; }
-    else { s.pending += o.total; s.pendingCount += 1; }
+    // An old unpaid order (before v1.3) counts in total sales only.
 
     if (o.order_type === 'dine_in') s.dineIn += 1;
     else if (o.order_type === 'parcel') s.parcel += 1;
@@ -107,7 +105,7 @@ export function summarize(orders: Order[], menuOrder: number[] = [], entries: Mo
     }
   }
   s.expensesByCategory = [...categories.values()].sort((a, b) => b.amount - a.amount);
-  s.profit = s.total - s.expenses;
+  s.profit = s.total + s.moneyIn - s.expenses;
 
   const rank = (menuId: number | null) => {
     const i = menuId == null ? -1 : menuOrder.indexOf(menuId);
@@ -133,7 +131,6 @@ export function summaryText(
     `Total sales: ${formatRupees(s.total)}`,
     `Cash: ${formatRupees(s.cash)}`,
     `UPI: ${formatRupees(s.upi)}`,
-    `Pending: ${formatRupees(s.pending)} (${s.pendingCount})`,
   ];
   if (s.items.length) {
     out.push('', 'Items sold:');
@@ -146,10 +143,10 @@ export function summaryText(
     out.push('', `Expenses: ${formatRupees(s.expenses)}`);
     for (const c of s.expensesByCategory) out.push(`${c.category}: ${formatRupees(c.amount)}`);
   }
-  out.push('', `*Profit (sales − expenses): ${formatRupees(s.profit)}*`);
   if (s.moneyIn || s.moneyOut) {
-    out.push(`Money added: ${formatRupees(s.moneyIn)} · Taken out: ${formatRupees(s.moneyOut)}`);
+    out.push('', `Money added: ${formatRupees(s.moneyIn)} · Taken out: ${formatRupees(s.moneyOut)}`);
   }
+  out.push('', `*Profit (sales + money added − expenses): ${formatRupees(s.profit)}*`);
   if (opts.balance) {
     const b = opts.balance;
     out.push('', `Balance now: Cash ${formatRupees(b.cash)} · Bank ${formatRupees(b.bank)} · Total ${formatRupees(b.total)}`);

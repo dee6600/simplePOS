@@ -33,7 +33,7 @@ async function expectRealData(db: SQLiteDatabase) {
   const menu = await listMenu(db);
   const s = summarize(orders, menu.map((m) => m.id));
   expect(orders).toHaveLength(43);
-  expect([s.total, s.upi, s.cash, s.pending]).toEqual([10420, 5660, 4760, 0]);
+  expect([s.total, s.upi, s.cash]).toEqual([10420, 5660, 4760]);
   expect(menu.map((m) => m.name)).toEqual([
     'Chicken Biryani Half', 'Chicken Biryani Full', 'Tandoori Biryani Half', 'Tandoori Biryani Full',
     'Chicken 65', 'Water Bottle', 'KHUSHKA',
@@ -100,7 +100,8 @@ test('expenses and lump sums move the Cash / Bank balance', async () => {
   });
   await createOrder(db, { lines: [line(1, 2)], status: 'cash', orderType: null }); // 400 cash
   await createOrder(db, { lines: [line(0, 1)], status: 'upi', orderType: null }); // 120 bank
-  await createOrder(db, { lines: [line(5, 1)], status: 'pending', orderType: null }); // 20 to collect
+  // An old unpaid order (saved before v1.3) counts in sales but not in the balance.
+  await db.runAsync("UPDATE orders SET status = 'pending' WHERE id = ?", (await createOrder(db, { lines: [line(5, 1)], status: 'cash', orderType: null })).id); // 20
 
   await addMoneyEntry(db, { kind: 'in', amount: 5000, method: 'cash', category: null, note: 'Opening cash' });
   const rice = await addMoneyEntry(db, { kind: 'expense', amount: 1200, method: 'cash', category: 'Rice', note: '' });
@@ -108,7 +109,7 @@ test('expenses and lump sums move the Cash / Bank balance', async () => {
   await addMoneyEntry(db, { kind: 'out', amount: 100, method: 'bank', category: 'Rice', note: 'to home' });
 
   expect(computeBalance(await getBalanceSums(db))).toEqual({
-    cash: 400 + 5000 - 1200, bank: 120 - 300 - 100, total: 4200 - 280, toCollect: 20, toCollectCount: 1,
+    cash: 400 + 5000 - 1200, bank: 120 - 300 - 100, total: 4200 - 280,
   });
 
   const entries = await listMoneyEntries(db, ALL);
@@ -122,7 +123,7 @@ test('expenses and lump sums move the Cash / Bank balance', async () => {
   expect(orders.every((o) => o.created_by === 'Mom')).toBe(true);
 
   const s = summarize(orders, [], entries);
-  expect([s.total, s.expenses, s.profit, s.moneyIn, s.moneyOut]).toEqual([540, 1500, -960, 5000, 100]);
+  expect([s.total, s.expenses, s.profit, s.moneyIn, s.moneyOut]).toEqual([540, 1500, 540 + 5000 - 1500, 5000, 100]); // money added counts as profit, taken out does not
   expect(s.expensesByCategory).toEqual([
     { category: 'Rice', amount: 1200, count: 1 },
     { category: 'Packing', amount: 300, count: 1 },

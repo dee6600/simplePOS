@@ -4,7 +4,7 @@ This document covers what SimplePOS is, who it's for, and how it's built. For th
 
 ## 1. Vision
 
-A phone point-of-sale app for a small family biryani restaurant. The owner enters each order on his phone during rush hours, tags it Pending, Paid Cash or Paid UPI, and fixes or deletes orders quickly. At the end of the day he sees how many plates of each item were sold and how much money came in; weekly and monthly summaries show the bigger picture.
+A phone point-of-sale app for a small family biryani restaurant. The owner enters each order on his phone during rush hours, tags it Paid Cash or Paid UPI (v1.3 removed Pending), and fixes or deletes orders quickly. At the end of the day he sees how many plates of each item were sold and how much money came in; weekly and monthly summaries show the bigger picture.
 
 Since v1.2 the app also tracks **business expenses** and **money added or taken out**, so it always shows the **cash in hand** and the **bank balance**, and the profit for any period. Every entry shows **who made it**. The family's phones can share one shop through **family sync** (free Firebase plan), so an order saved on one phone shows up on the others.
 
@@ -30,7 +30,7 @@ Small and fixed. Names and prices are editable in the app; these are the startin
 
 - Save an order in **2–3 taps**: tap the items, then tap one status button.
 - Edit, mark paid, or delete an order in one or two taps, with Undo for delete.
-- Accurate **per-item plate counts** and **cash / UPI / pending** totals for any day, week or month.
+- Accurate **per-item plate counts** and **cash / UPI** totals for any day, week or month.
 - Record an expense or lump sum in a few taps, and always know **Cash in hand**, **Bank** and **Total**.
 - See **who** entered each order, expense and lump sum.
 - Work **fully offline**: the internet must never slow down the counter. With family sync on, all phones catch up within seconds once online.
@@ -50,27 +50,27 @@ Small and fixed. Names and prices are editable in the app; these are the startin
 | #  | Feature | Status |
 | -- | ------- | ------ |
 | 1  | Tap item tiles to build an order; "−" removes one | ✅ v1 |
-| 2  | Save as **Pending**, **Paid Cash** or **Paid UPI** in one tap | ✅ v1 |
+| 2  | Save as **Paid Cash** or **Paid UPI** in one tap (Pending removed in v1.3) | ✅ v1 |
 | 3  | Order numbers restart at #1 each day and are never reused that day (on one phone) | ✅ v1 |
-| 4  | Today's orders list with All / Pending / Paid filters | ✅ v1 |
-| 5  | Mark a pending order paid (Cash/UPI) straight from the list | ✅ v1 |
+| 4  | Today's orders list (the All / Pending / Paid filters were removed in v1.3) | ✅ v1 |
+| 5  | Settle an old "Not paid" order (saved by a v1.2 phone) as Cash/UPI straight from the list | ✅ v1 |
 | 6  | Edit any order (items, status, tag) | ✅ v1 |
 | 7  | Delete an order with a 6-second Undo | ✅ v1 |
 | 8  | Browse orders of earlier days | ✅ v1 |
 | 9  | Summary for Day / Week (Mon–Sun) / Month, browsable back in time | ✅ v1 |
-| 10 | Summary shows total sales, cash, UPI, pending, plates per item, day-by-day | ✅ v1 |
+| 10 | Summary shows total sales, cash, UPI, plates per item, day-by-day | ✅ v1 |
 | 11 | Share a summary as text (WhatsApp, SMS) | ✅ v1 |
 | 12 | Optional Dine-in / Parcel tag, hidden unless turned on in Settings | ✅ v1 |
 | 13 | Edit menu: name, price, colour, order, hide, add, delete | ✅ v1 |
 | 14 | Restaurant name setting | ✅ v1 |
 | 15 | Backup export (JSON via share sheet) and restore | ✅ v1 |
 | 16 | Money tab: expenses with preset categories and a note; **Add money** / **Take out** lump sums; Cash or Bank/UPI; edit, delete with Undo | ✅ v1.2 |
-| 17 | Running balance: Cash in hand, Bank, Total; pending orders shown as "to collect" | ✅ v1.2 |
+| 17 | Running balance: Cash in hand, Bank, Total | ✅ v1.2 |
 | 18 | One-time Welcome screen (phone number + who you are); orders show who made them; money entries show who added and last edited them | ✅ v1.2 |
 | 19 | Summary adds expenses by category, profit, lump sums and balance now (also in the shared text) | ✅ v1.2 |
 | 20 | Family sync: sign in with your own phone number (no PIN/SMS), only numbers on the family list (`members`), one shop for the whole family, live updates, offline queue, sync badge | ✅ v1.2 |
 | 21 | Backup v2 includes money entries; v1 backups still restore | ✅ v1.2 |
-| 22 | "All pending orders" view across days | Later |
+| 22 | Online updates (EAS Update), Check for app update, app version of each family phone | ✅ v1.3 |
 | 23 | Bill printing / sharing a bill | Later |
 | 24 | Customer name or table note on an order | Later |
 | 25 | "Business day ends at" setting for closing after midnight | Later |
@@ -101,12 +101,12 @@ src/app/
 ### New Order layout
 
 - Item tiles fill the screen: 2 columns on phones, 3–4 on tablets. Each tile has its own colour, its name and price, a quantity badge, and a "−" button once added.
-- A bottom panel shows the optional Dine-in/Parcel switch, the item count, a Clear button, the total, and three large buttons: **Pending · Paid Cash · Paid UPI**. Tapping one saves the order and clears the screen.
+- A bottom panel shows the optional Dine-in/Parcel switch, the item count, a Clear button, the total, and two large buttons: **Paid Cash · Paid UPI** (Pending was removed in v1.3). Tapping one saves the order and clears the screen.
 - Confirmations appear as a toast at the **top** of the screen, so they never cover the buttons.
 
 ### Money layout
 
-- A dark **Balance now** card: Cash in hand, Bank (UPI), Total, and "+ ₹N still to collect (N pending orders)".
+- A dark **Balance now** card: Cash in hand, Bank (UPI) and Total.
 - Three large buttons: **Expense**, **Add money**, **Take out**. Each opens a form: amount, category (expenses only), **Cash** or **Bank / UPI**, and an optional note.
 - ◀ ▶ day browsing, the day's totals, and the day's entries, each showing the time and "by Shree · edited by Mom". Tap an entry to edit or delete it (with Undo).
 
@@ -164,10 +164,10 @@ src/app/
 | Download cursor | `synced_at` server timestamp | Phone clocks can differ; the server's can't |
 | Order documents | One document per order, items embedded | One write per order or edit |
 | Money | Whole rupees as integers | No paise on this menu; no rounding errors |
-| Payment status | `pending` / `cash` / `upi` | Lets the summary split cash from UPI to tally the cash box |
+| Payment status | `cash` / `upi` (`pending` only on orders saved before v1.3) | Lets the summary split cash from UPI to tally the cash box |
 | Money entries | `kind` = `expense` / `in` / `out`, `method` = `cash` / `bank` | Covers expenses, opening balance, money taken home or deposited |
 | Balance | Computed from all orders and entries, never stored | Always consistent after edits, deletes and sync |
-| Profit | Sales − expenses; pending counts as sales; lump sums excluded | Lump sums move money, they aren't income or cost |
+| Profit | Sales + money added − expenses (v1.3); money taken out excluded | The family counts added money as income; a withdrawal isn't a business cost |
 | Order snapshots | Copy name and price into `order_items` | Menu edits never change past orders or reports |
 | Delete | Soft delete (`deleted = 1`) for orders, money entries and menu items | Undo is trivial and deletes sync like edits |
 | Order numbers | Per day, `MAX + 1` including deleted | Easy to call out. Two phones saving at the same instant can get the same number; accepted as cosmetic |
@@ -265,16 +265,16 @@ These are implemented in `src/lib/summary.ts`, `src/lib/balance.ts` and `src/lib
 
 1. Only non-deleted orders and money entries with `created_at` inside the period count.
 2. A day runs from local midnight to midnight. A week runs Monday 00:00 to the next Monday. A month runs from the 1st to the 1st of the next month.
-3. `total sales = Σ order.total`, split into **cash**, **UPI** and **pending** by status, each with an order count.
+3. `total sales = Σ order.total`, split into **cash** and **UPI** by status, each with an order count. An old Pending order (v1.2) counts in the total only.
 4. Plates per item are summed by `menu_item_id`, so a rename or price change mid-month still counts as one item. The newest name is shown, and amounts use the price at the time of each order.
 5. Items are listed in menu order. Items no longer on the menu come last.
 6. **Expenses** are totalled and grouped by category (largest first). An expense with no category counts as "Other".
-7. **Profit = total sales − expenses.** Pending orders count as sales. Lump sums (money added / taken out) are shown separately and are not part of profit.
+7. **Profit = total sales + money added − expenses** (v1.3). Money taken out is shown separately and doesn't reduce profit.
 8. Week and month views add a day-by-day list (days with orders or expenses, newest first). Tapping a day opens it.
 9. **Balance** is all-time, not per period:
    - Cash in hand = paid-Cash orders + cash added − cash taken out − cash expenses
    - Bank = paid-UPI orders + bank added − bank taken out − bank expenses
-   - Total = Cash + Bank. Pending orders are not in the balance; they're shown as "to collect".
+   - Total = Cash + Bank. An old Pending order (v1.2) is not in the balance until it is settled as Cash or UPI.
    - An opening balance is entered as an **Add money** entry.
 
 ## 7. Backup format
@@ -328,4 +328,4 @@ These are implemented in `src/lib/summary.ts`, `src/lib/balance.ts` and `src/lib
 | Tapping the wrong status in a rush | The toast after saving has an EDIT button. Status can also be changed from the Orders list |
 | iPhone install with a free Apple personal team expires after 7 days | Reinstall weekly from the Mac, or pay for an Apple Developer account ($99/yr) for TestFlight. Android `.apk` install is free |
 | Expense categories are a fixed list | "Other" plus the note covers anything else. Editable categories are a "Later" idea |
-| Pending orders from earlier days are easy to miss | The Money tab shows the total still to collect. Open question: add an "all pending orders" view across days? |
+| Old Pending orders from v1.2 phones | Shown as "Not paid" with Cash / UPI buttons until every phone runs v1.3 |

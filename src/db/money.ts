@@ -60,12 +60,10 @@ export async function getMoneyEntry(db: SQLiteDatabase, id: number): Promise<Mon
 
 /** All-time sums that make up the running Cash / Bank balance. */
 export async function getBalanceSums(db: SQLiteDatabase): Promise<BalanceSums> {
-  const orders = await db.getFirstAsync<{ cash: number; upi: number; pending: number; pending_count: number }>(`
+  const orders = await db.getFirstAsync<{ cash: number; upi: number }>(`
     SELECT
       COALESCE(SUM(CASE WHEN status = 'cash' THEN total END), 0) AS cash,
-      COALESCE(SUM(CASE WHEN status = 'upi' THEN total END), 0) AS upi,
-      COALESCE(SUM(CASE WHEN status = 'pending' THEN total END), 0) AS pending,
-      COUNT(CASE WHEN status = 'pending' THEN 1 END) AS pending_count
+      COALESCE(SUM(CASE WHEN status = 'upi' THEN total END), 0) AS upi
     FROM orders WHERE deleted = 0
   `);
   const money = await db.getAllAsync<{ kind: MoneyKind; method: Method; amount: number }>(`
@@ -77,8 +75,6 @@ export async function getBalanceSums(db: SQLiteDatabase): Promise<BalanceSums> {
   return {
     cashSales: orders?.cash ?? 0,
     upiSales: orders?.upi ?? 0,
-    pending: orders?.pending ?? 0,
-    pendingCount: orders?.pending_count ?? 0,
     cashIn: pick('in', 'cash'),
     cashOut: pick('out', 'cash'),
     cashExpenses: pick('expense', 'cash'),
