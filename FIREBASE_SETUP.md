@@ -6,7 +6,7 @@ Family sync lets every family phone see the same orders, expenses and balance, l
 
 **How it works, in short:** each family member signs in once with their **own mobile number** and picks their name. There is no PIN and no SMS code (SMS codes would need Firebase's paid Blaze plan). Everyone reaches the same shop: this Firebase project holds exactly one shop. Each phone saves everything on the phone first, then uploads it when there is internet. The newest edit wins if two phones change the same thing.
 
-**Security is deliberately simple**, as the family asked, because only the family has the app: any signed-in phone can read and change the shop's data, and signed-out visitors are blocked. Anyone who has the app and types any 10-digit number can open the shop. If the app is ever shared outside the family, sign-in must be redesigned first (per-person PINs or SMS codes, and a list of who may join).
+**Security is kept simple, with a family list.** Only phone numbers on the family list (the `members` collection, step 4) can read and change the shop's data; any other number, and anyone signed out, is blocked. The project's settings live in a private file (`.env.local`, step 6) that is never put on GitHub, so the public code isn't connected to the family's shop. Strangers who have the public code, or the old settings from the git history, get nothing. (They could still create empty Firebase logins, which is harmless: those logins can't read or change anything.) Sign-in itself is still simple, with no PIN and no SMS code: someone who knows a family member's number **and** has the private settings could sign in as them. That is accepted for family use. If the app is ever shared outside the family, add per-person PINs or SMS codes first.
 
 ---
 
@@ -37,9 +37,27 @@ Nobody types an email in the app. Behind the scenes the app turns each phone num
 3. Location: **asia-south1 (Mumbai)**. This can't be changed later.
 4. Choose **Start in production mode**, then **Create**.
 
-### 4. Publish the security rules
+### 4. Family members
 
-The rules let any signed-in family member read and write the shop's data, and block everyone who isn't signed in.
+The family list says which phone numbers may use the shop: one document per person in a top-level collection called `members`. Only you add these, here in the Firebase console. The app can never read or change this list.
+
+**Do this before step 5.** The new rules only let in numbers on this list, so add everyone first, then publish the rules.
+
+1. In **Firestore Database**, open the **Data** tab.
+2. Click **+ Start collection**. Collection ID: `members`. Click **Next**.
+3. **Document ID:** the person's number with `91` in front and no spaces or `+`, e.g. `919876543210` for `98765 43210`. (Don't use **Auto-ID**.)
+4. Add a field: name `name`, type **string**, value the person's name (e.g. `Dad`).
+5. Click **Save**.
+6. For each other family member, click **+ Add document** in the `members` collection and repeat steps 3–5.
+
+Later:
+
+- **New family member:** add a document for their number in `members` (steps 3–5). They can then sign in on their phone.
+- **Remove someone:** delete their document in `members`. Their phone can no longer read or change the shop.
+
+### 5. Publish the security rules
+
+The rules let only numbers on the family list read and write the shop's data, and block everyone else. Nobody can read or change `members` through the app.
 
 1. In **Firestore Database**, open the **Rules** tab.
 2. Delete everything in the editor and paste the full contents of `firestore.rules` from this project:
@@ -48,10 +66,27 @@ The rules let any signed-in family member read and write the shop's data, and bl
    rules_version = '2';
    service cloud.firestore {
      match /databases/{database}/documents {
-       // The family's shop. Any family member signed in to the app (phone number login) can read and write.
-       // Signed-out visitors can't. Deliberately simple, as the family asked.
+
+       // Family members: one document per allowed phone number, e.g. members/919876543210 { name: "Dad" }.
+       // Added by the owner in the Firebase console only; the app can never read or change this list.
+       match /members/{phone} {
+         allow read, write: if false;
+       }
+
+       // The signed-in person's phone number (the app signs in as <91number>@family.simplepos.app).
+       function phone() {
+         return request.auth.token.email.split('@')[0];
+       }
+
+       function isFamily() {
+         return request.auth != null
+           && request.auth.token.email.matches('^91[0-9]{10}@family[.]simplepos[.]app$')
+           && exists(/databases/$(database)/documents/members/$(phone()));
+       }
+
+       // The family's shop: only phone numbers on the members list can read or write.
        match /shops/{shopId}/{document=**} {
-         allow read, write: if request.auth != null;
+         allow read, write: if isFamily();
        }
      }
    }
@@ -59,31 +94,32 @@ The rules let any signed-in family member read and write the shop's data, and bl
 
 3. Click **Publish**.
 
-### 5. Register the app and copy its settings
+### 6. Register the app and put its settings in `.env.local`
 
 1. Click the **gear icon → Project settings**, and stay on the **General** tab.
 2. Under **Your apps**, click the **Web** icon (`</>`).
 3. App nickname: `SimplePOS`. Leave **Firebase Hosting** unticked. Click **Register app**.
-4. Firebase shows a `firebaseConfig` block. Copy its six values into `src/sync/config.ts`:
+4. Firebase shows a `firebaseConfig` block with six values.
+5. In the project folder, copy `.env.example` to a new file called `.env.local` and fill in the six values from that block:
 
-   ```ts
-   export const firebaseConfig = {
-     apiKey: 'AIza…',
-     authDomain: 'reddys-biryani-pos.firebaseapp.com',
-     projectId: 'reddys-biryani-pos',
-     storageBucket: 'reddys-biryani-pos.firebasestorage.app',
-     messagingSenderId: '123456789012',
-     appId: '1:123456789012:web:abc123…',
-   };
+   ```
+   EXPO_PUBLIC_FIREBASE_API_KEY=AIza…
+   EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=reddys-biryani-pos.firebaseapp.com
+   EXPO_PUBLIC_FIREBASE_PROJECT_ID=reddys-biryani-pos
+   EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=reddys-biryani-pos.firebasestorage.app
+   EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=123456789012
+   EXPO_PUBLIC_FIREBASE_APP_ID=1:123456789012:web:abc123…
    ```
 
    You can find these again later under **Project settings → General → Your apps → SimplePOS → SDK setup and configuration → Config**.
 
-These values are **not secret**. They only identify the project. The security rules from step 4 keep signed-out visitors out.
+**Keep `.env.local` private.** Git ignores it (`.env*.local` in `.gitignore`), so it never goes to GitHub. Expo builds the values into the app, and `.easignore` (a copy of `.gitignore` without the `.env*.local` line) makes EAS builds, in the cloud and with `--local`, include the file. Without `.env.local` (for example, someone building the public GitHub code), sync is off and the app works on one phone with its own data, so the public code can't reach the family's shop.
 
-### 6. Rebuild the apps
+The values only identify the project; the family list (step 4) and the rules (step 5) decide who gets in. The old settings were once in a public commit, which is why the rules now check the family list. Optionally, you can also restrict the API key in the [Google Cloud console](https://console.cloud.google.com) (**APIs & Services → Credentials**, pick the key used by the app); this isn't required.
 
-The Firebase settings are built into the app, so after filling in `src/sync/config.ts` the iPhone and Android apps must be **rebuilt and reinstalled** (see [README.md](README.md#install-on-a-phone)). If you're not the developer, send the values to the developer and wait for the new build.
+### 7. Rebuild the apps
+
+The Firebase settings are built into the app, so after filling in or changing `.env.local` the iPhone and Android apps must be **rebuilt and reinstalled** (see [README.md](README.md#install-on-a-phone)). If you're not the developer, send the values to the developer privately and wait for the new build.
 
 Until this is done, **Settings → Family sync** says "Family sync is not set up in this version of the app yet".
 
@@ -91,11 +127,11 @@ Until this is done, **Settings → Family sync** says "Family sync is not set up
 
 ## Part B: Connect the phones
 
-Every phone needs app **v1.2** installed. On first launch each phone shows a one-time **Welcome** screen: **Your phone number** (the person's own 10-digit mobile number) and **Who are you?** (tap Mom, Dad, Shree or Dee, or type a name). You can change the name later in **Settings → This phone**.
+Every phone needs app **v1.2** installed, and each person's number must be on the family list (step 4). On first launch each phone shows a one-time **Welcome** screen: **Your phone number** (the person's own 10-digit mobile number) and **Who are you?** (tap Mom, Dad, Shree or Dee, or type a name). You can change the name later in **Settings → This phone**.
 
 **Order:** sign in on the shop phone first if you can. The order is safe either way: only orders and money entries count as the shop's data. If an empty phone happens to sign in first, the shop phone still uploads all its orders when it signs in (it isn't asked to choose), and its menu replaces the empty phone's placeholder menu on every phone.
 
-### 7. The shop phone (the one with the existing orders), first
+### 8. The shop phone (the one with the existing orders), first
 
 1. Make sure the phone has internet.
 2. Export a backup first, just in case: on v1.0 before updating, or on v1.2 tap **Continue without sync for now**, export from **Settings → Backup**, then sign in from **Settings → Family sync**.
@@ -105,7 +141,7 @@ Every phone needs app **v1.2** installed. On first launch each phone shows a one
    If the phone already picked a name on an earlier v1.2 build, it won't show the Welcome screen. Go to **Settings → Family sync** instead, enter your phone number and tap **Sign in and sync**.
 5. The phone uploads its menu, orders, money entries and settings. The badge under each screen title shows **Uploading N…** and then **Synced ✓**.
 
-### 8. Each other phone
+### 9. Each other phone
 
 1. Install v1.2 and open it.
 2. On the **Welcome** screen, enter **this person's own** phone number and pick their name. Tap **Continue**.
@@ -131,8 +167,8 @@ Signing in again with the same number (for example after reinstalling the app) r
 - **Settings → Family sync** shows the sync status, **Sync now** and **Sign out**. Signing out disconnects the phone; its data stays on the phone. When a phone isn't signed in, this section has a phone number field and **Sign in and sync**.
 - **Restoring a backup** is blocked while a phone is syncing. Tap **Sign out** under Family sync first.
 - **Keep exporting a weekly backup** (Settings → Export backup) to WhatsApp or Google Drive. Sync isn't a backup: a mistaken delete syncs to every phone.
-- **Firebase Authentication → Users** lists one user per family member (shown as `<91number>@family.simplepos.app`). Deleting a person's user there only means they must sign in again on their phone.
-- **Don't delete the data in Firestore Database.** That deletes the shop for every phone.
+- **Firebase Authentication → Users** lists one user per number that has signed in (shown as `<91number>@family.simplepos.app`). Deleting a person's user there only means they must sign in again on their phone. Logins whose number isn't in `members` can't read or change anything. To let a person in or keep them out, edit `members` (step 4).
+- **Don't delete the data in Firestore Database.** Deleting `shops` deletes the shop for every phone; deleting `members` locks the whole family out.
 - **Never change** `SHOP_ID`, the salt or the email format in `src/sync/shopLogin.ts` once the family is using sync. Existing logins and data would no longer be found.
 
 ---
@@ -141,11 +177,11 @@ Signing in again with the same number (for example after reinstalling the app) r
 
 | The app says | What to do |
 | ------------ | ---------- |
-| Family sync is not set up in this version of the app yet | `src/sync/config.ts` is still empty, or the phone has an old build. Do steps 5 and 6. |
+| Family sync is not set up in this version of the app yet | The app was built without `.env.local` (or with empty values), or the phone has an old build. Do steps 6 and 7. |
 | Enter your 10-digit mobile number. | Type the person's own Indian mobile number, e.g. `98765 43210` (with or without `+91`). |
 | Email/Password sign-in is not turned on in the Firebase project (FIREBASE_SETUP.md, step 2). | Do step 2. |
 | This number is registered with a different app setup. Ask the developer. | The number already has a login, but with a different password (the salt in `src/sync/shopLogin.ts` was changed, see "Never change" above). The developer can delete that user in **Authentication → Users**, then the person signs in again. |
-| The shop data is locked. Check the Firestore security rules (FIREBASE_SETUP.md, step 4). … or, under Status, "Missing or insufficient permissions" | The rules weren't published, or weren't pasted in full. Do step 4. |
+| This phone number is not on the family list yet. Ask Dee to add it in Firebase (FIREBASE_SETUP.md, "Family members"). … or, under Status, "Missing or insufficient permissions" | The number isn't in `members`, or its Document ID is wrong (it must be `91` + the 10 digits, no spaces). Do step 4. If everyone gets this, the new rules were published before the family members were added (add them now, step 4), or the rules weren't published or pasted in full (do step 5 again). |
 | An error under Status that mentions the database not existing | The Firestore database wasn't created. Do step 3. |
 | No internet connection. Connect to the internet and try again. | Signing in needs internet. After that, the phone works offline. |
 | Too many attempts. Wait a few minutes and try again. | Firebase paused sign-ins after many tries. Wait, then retry. |

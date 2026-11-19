@@ -2,6 +2,7 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, type Auth }
 import type { Firestore } from 'firebase/firestore';
 import type { SQLiteDatabase } from 'expo-sqlite';
 
+import { withTx } from '../db/tx';
 import { countLocalOrders, prepareCreate, prepareJoin } from './connect';
 import { FirestoreRemote } from './firestoreRemote';
 import type { RemoteStore } from './remote';
@@ -75,8 +76,41 @@ export async function attachToShop(
     return { status: 'connected', shopId: SHOP_ID, myPhone, created: true };
   }
   if (localCount > 0 && mode === 'ask') return { status: 'choose', localCount };
+  if (mode === 'keepLocal') await dropOrdersAlreadyInShop(db, remote);
   await prepareJoin(db, SHOP_ID, myPhone, mode === 'keepLocal');
   return { status: 'connected', shopId: SHOP_ID, myPhone, created: false };
+}
+
+/**
+ * Before keeping this phone's data: remove local copies of orders / money entries the shop already has
+ * (e.g. the shop's data was imported from this phone's backup), so they aren't added twice.
+ * Matched by exact time + number + amount, because upgrading old data gives each row a new id.
+ */
+async function dropOrdersAlreadyInShop(db: SQLiteDatabase, remote: RemoteStore): Promise<void> {
+  const orderKeys = new Set(
+    (await remote.getAll('orders')).map((o) => `${o.created_at}|${o.order_no}|${o.total}`),
+  );
+  const moneyKeys = new Set(
+    (await remote.getAll('money')).map((m) => `${m.created_at}|${m.kind}|${m.amount}`),
+  );
+  await withTx(db, async () => {
+    const orders = await db.getAllAsync<{ id: number; created_at: number; order_no: number; total: number }>(
+      'SELECT id, created_at, order_no, total FROM orders',
+    );
+    for (const o of orders) {
+      if (!orderKeys.has(`${o.created_at}|${o.order_no}|${o.total}`)) continue;
+      await db.runAsync('DELETE FROM order_items WHERE order_id = ?', o.id);
+      await db.runAsync('DELETE FROM orders WHERE id = ?', o.id);
+    }
+    const money = await db.getAllAsync<{ id: number; created_at: number; kind: string; amount: number }>(
+      'SELECT id, created_at, kind, amount FROM money_entries',
+    );
+    for (const m of money) {
+      if (moneyKeys.has(`${m.created_at}|${m.kind}|${m.amount}`)) {
+        await db.runAsync('DELETE FROM money_entries WHERE id = ?', m.id);
+      }
+    }
+  });
 }
 
 const MESSAGES: Record<string, string> = {
@@ -84,7 +118,8 @@ const MESSAGES: Record<string, string> = {
   'auth/too-many-requests': 'Too many attempts. Wait a few minutes and try again.',
   'auth/operation-not-allowed': 'Email/Password sign-in is not turned on in the Firebase project (FIREBASE_SETUP.md, step 2).',
   'auth/email-already-in-use': 'This number is registered with a different app setup. Ask the developer.',
-  'permission-denied': 'The shop data is locked. Check the Firestore security rules (FIREBASE_SETUP.md, step 4).',
+  'permission-denied':
+    'This phone number is not on the family list yet. Ask Dee to add it in Firebase (FIREBASE_SETUP.md, "Family members").',
   unavailable: 'No internet connection. Connect to the internet and try again.',
 };
 

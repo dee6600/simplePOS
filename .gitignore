@@ -44,3 +44,7 @@ yarn-error.*
 data/
 firestore-debug.log
 *-debug.log
+
+# built app files
+build/
+*.apk

@@ -45,6 +45,20 @@ async function newPhoneDb(user: string) {
   return db;
 }
 
+/** Adds a family member the way the owner does in the console (emulator admin access bypasses the rules). */
+async function addMember(phone: string, name: string) {
+  const project = process.env.GCLOUD_PROJECT ?? 'demo-simplepos';
+  const res = await fetch(
+    `http://${process.env.FIRESTORE_EMULATOR_HOST}/v1/projects/${project}/databases/(default)/documents/members?documentId=${phone}`,
+    {
+      method: 'POST',
+      headers: { Authorization: 'Bearer owner', 'content-type': 'application/json' },
+      body: JSON.stringify({ fields: { name: { stringValue: name } } }),
+    },
+  );
+  if (!res.ok) throw new Error(`addMember failed: ${res.status}`);
+}
+
 async function waitFor(check: () => Promise<boolean>, what: string, ms = 15_000) {
   const end = Date.now() + ms;
   while (Date.now() < end) {
@@ -62,6 +76,21 @@ afterAll(async () => {
 });
 
 (RUN ? test : test.skip)('Dad and Mom sign in with their own numbers and share one shop', async () => {
+  for (const [phone, name] of [['919876543210', 'Dad'], ['919123456789', 'Mom'], ['919000000001', 'Shree']]) {
+    await addMember(phone, name);
+  }
+
+  // Someone with the public code but a number that isn't on the family list gets nothing.
+  const stranger = phoneApp('stranger');
+  const strangerDb = await newPhoneDb('Stranger');
+  await expect(connectShop(strangerDb, stranger.auth, stranger.fs, '95555 55555', 'ask')).rejects.toThrow(
+    'not on the family list',
+  );
+  await expect(getDocs(collection(stranger.fs, 'shops', SHOP_ID, 'orders'))).rejects.toMatchObject({
+    code: 'permission-denied',
+  });
+  await expect(getDocs(collection(stranger.fs, 'members'))).rejects.toMatchObject({ code: 'permission-denied' });
+
   // Dad's phone already has the shop's data from before sync.
   const dad = phoneApp('dad');
   const dadDb = await newPhoneDb('Dad');

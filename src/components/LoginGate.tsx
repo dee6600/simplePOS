@@ -44,11 +44,11 @@ export function LoginGate() {
         Alert.alert(
           'This phone already has data',
           `This phone has ${result.localCount} orders/money entries, and the family's shop already has data.\n\n` +
-            '"Use shop data only" removes this phone\'s entries. If you are not sure, cancel, tap ' +
-            '"Continue without sync for now" and export a backup in Settings first.',
+            '"Add this phone\'s orders" uploads only the ones the shop doesn\'t have yet (usual choice for the ' +
+            'shop phone). "Use shop data only" removes this phone\'s entries (for test phones).',
           [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Also add this phone\'s data', onPress: () => connectThenFinish('keepLocal') },
+            { text: 'Add this phone\'s orders', onPress: () => connectThenFinish('keepLocal') },
             { text: 'Use shop data only', style: 'destructive', onPress: () => connectThenFinish('discardLocal') },
           ],
         );

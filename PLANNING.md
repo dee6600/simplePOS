@@ -38,7 +38,7 @@ Small and fixed. Names and prices are editable in the app; these are the startin
 
 ### Non-goals (for now)
 
-- Real per-person security or permissions (each person signs in with their own number, but there is no PIN or SMS check, and every signed-in phone can do everything; the name on a phone is a label, not security)
+- Real per-person security or permissions (only numbers on the family list get in, but there is no PIN or SMS check, and every family phone can do everything; the name on a phone is a label, not security)
 - Printed bills or receipts
 - Discounts, taxes, or cash change calculation
 - Stock/inventory tracking
@@ -68,14 +68,14 @@ Small and fixed. Names and prices are editable in the app; these are the startin
 | 17 | Running balance: Cash in hand, Bank, Total; pending orders shown as "to collect" | ✅ v1.2 |
 | 18 | One-time Welcome screen (phone number + who you are); orders show who made them; money entries show who added and last edited them | ✅ v1.2 |
 | 19 | Summary adds expenses by category, profit, lump sums and balance now (also in the shared text) | ✅ v1.2 |
-| 20 | Family sync: sign in with your own phone number (no PIN/SMS), one shop for the whole family, live updates, offline queue, sync badge | ✅ v1.2 |
+| 20 | Family sync: sign in with your own phone number (no PIN/SMS), only numbers on the family list (`members`), one shop for the whole family, live updates, offline queue, sync badge | ✅ v1.2 |
 | 21 | Backup v2 includes money entries; v1 backups still restore | ✅ v1.2 |
 | 22 | "All pending orders" view across days | Later |
 | 23 | Bill printing / sharing a bill | Later |
 | 24 | Customer name or table note on an order | Later |
 | 25 | "Business day ends at" setting for closing after midnight | Later |
 | 26 | Sales charts, CSV export, Hindi/Telugu labels | Later |
-| 27 | Proper per-person logins (PIN or SMS, member list) if the app goes public; editable expense categories | Later |
+| 27 | Proper per-person logins (PIN or SMS) if the app is shared outside the family; editable expense categories | Later |
 
 ## 3. Screens and navigation
 
@@ -136,7 +136,8 @@ src/app/
 
 - **Login (`src/sync/shopLogin.ts`, `connectShop.ts`):** each person types their own 10-digit Indian mobile number (`98765 43210`, `+91…` or `0…` all work; it's stored as `919876543210`). The app turns it into a Firebase email/password login, `<91number>@family.simplepos.app` with a password derived from the number and a fixed salt. The first sign-in with a number creates that person's login; later sign-ins (e.g. after a reinstall) reach the same login. No PIN, no SMS (SMS OTP needs the paid Blaze plan). The login is kept across restarts (AsyncStorage).
 - **One shop per Firebase project:** `SHOP_ID = 'main'`, so every family member's login reaches the same data. Never change `SHOP_ID`, the salt or the email format once in use: existing logins and data would no longer be found.
-- **Cloud layout:** `shops/main/{collection}/{uid}`, where the collections are `menu_items`, `orders` (one document per order, with its items embedded), `money` (money entries) and `meta` (a single `settings` document: restaurant name and the Dine-in/Parcel toggle). `firestore.rules` lets any signed-in user read and write, and blocks signed-out visitors. That is deliberately simple, as the family asked: anyone with the app who types any number can open the shop.
+- **Cloud layout:** `shops/main/{collection}/{uid}`, where the collections are `menu_items`, `orders` (one document per order, with its items embedded), `money` (money entries) and `meta` (a single `settings` document: restaurant name and the Dine-in/Parcel toggle). `firestore.rules` lets only numbers on the family list read and write `shops/**`, and blocks everyone else.
+- **Family list:** a top-level collection `members`, one document per person: Document ID = the number with `91` in front (e.g. `919876543210`), field `name` (string). The owner adds and deletes these in the Firebase console; the app can never read or change `members`. The rules check that the signed-in email is `<91number>@family.simplepos.app` and that `members/<91number>` exists. A number not on the list gets "This phone number is not on the family list yet. Ask Dee to add it in Firebase (FIREBASE_SETUP.md, "Family members")." Add the members before publishing the rules.
 - **Upload (offline queue):** every local change sets `dirty = 1` on the row. The engine uploads dirty rows in batches of 400, stamping each document with `synced_at` (server time), and then clears `dirty`, unless the row was edited again meanwhile. Uploads run shortly after any change, when the app returns to the foreground, every 30 seconds, and 15 seconds after a failure.
 - **Download (live):** one Firestore listener per collection for documents with `synced_at` after the saved cursor (minus a 1-minute overlap; applying a document twice is harmless). The cursor is saved per collection on the phone.
 - **Conflicts:** the copy with the newer `updated_at` wins. Deletes are soft deletes, so they sync like any other edit.
@@ -144,7 +145,7 @@ src/app/
   - **Shop has no orders or money entries yet:** if this phone has some (the shop phone), everything on it is uploaded and any menu left by an earlier empty phone is replaced. If this phone is empty too, it takes the shop's menu (or, if there is none yet, uploads its starting menu).
   - **Shop has data** (later phones): the phone downloads it; the menu and shop settings always come from the shop. If the phone already has its own orders or money entries, it first asks: **Use shop data only** (delete them and download the shop's) or **Also add this phone's data** (keep them and upload them too).
 - **Sign out** (Settings → Family sync) stops syncing; the data stays on the phone. Restore backup is blocked while syncing.
-- Without Firebase settings in `src/sync/config.ts`, sync is switched off and the app works as a single-phone app.
+- **Settings:** the six Firebase values come from a private `.env.local` (`EXPO_PUBLIC_FIREBASE_API_KEY`, `_AUTH_DOMAIN`, `_PROJECT_ID`, `_STORAGE_BUCKET`, `_MESSAGING_SENDER_ID`, `_APP_ID`; template `.env.example`), read by `src/sync/config.ts` and built into the app by Expo. Git ignores it (`.env*.local`); `.easignore` (a copy of `.gitignore` without that line) lets EAS builds include it. Without it, sync is switched off and the app works as a single-phone app with its own data, so a build of the public code can't reach the family's shop.
 
 ### Key decisions
 
@@ -155,7 +156,8 @@ src/app/
 | Cloud | Firebase Firestore + Auth, free Spark plan | No server code, no card, live listeners, India region. 20k writes / 50k reads a day is far above our use |
 | Sign-in | Each person's own phone number + name, turned into a Firebase email/password login behind the scenes. No PIN, no SMS | What the family asked for: one-time, nothing to remember. SMS OTP would need the paid Blaze plan |
 | Shops | Exactly one shop per Firebase project (`SHOP_ID = 'main'`) | Every family login reaches the same data without inviting or linking accounts |
-| Security rules | Any signed-in user can read/write `shops/**`; signed-out visitors are blocked | Family-only app; weak on purpose and accepted (see Risks). Must be redesigned if the app is ever made public |
+| Security rules | Only numbers listed in `members` (added by the owner in the console) can read/write `shops/**`; nobody can read or change `members` from the app | Strangers with the public code or old settings get nothing. Sign-in itself stays simple (see Risks) |
+| Firebase settings | Private `.env.local` (template `.env.example`), ignored by git, included in EAS builds via `.easignore` | The public repo isn't connected to the family's shop; builds without the file have sync off. Changing it needs a rebuild |
 | Row ids | Random UUID `uid` (expo-crypto) on orders, menu items and money entries | Rows made on different phones never collide. The local integer `id` stays for joins |
 | Offline queue | `dirty` flag on each row | No separate queue table; survives restarts |
 | Conflicts | Newest `updated_at` wins (phone clock) | Rare for this shop; simple and predictable |
@@ -303,7 +305,7 @@ These are implemented in `src/lib/summary.ts`, `src/lib/balance.ts` and `src/lib
 - **Unit tests** (Jest, `npm test`) for the date ranges, summary and balance maths, formatting, and the phone-number login (accepted number formats, rejected ones, a stable login per number). At the time of writing: 31 passed, 1 skipped (the emulator test).
 - **Database tests** run the real SQL in `src/db` against Node's built-in SQLite. They cover migrations, order numbering, edit, delete/undo, menu edits, settings, a backup round-trip, upgrading v1.0 data in place and restoring a v1 backup (using the real 18 Nov backup in `data/`, which is gitignored; skipped if missing), and the Cash/Bank balance.
 - **Sync tests** run two simulated phones against an in-memory cloud: shop phone uploads and a family phone joins live, newest edit wins, offline entries uploading later without duplicates, and joining with keep-local vs discard.
-- **Emulator test** (`npm run test:emulator`) runs the real phone-number login, Firestore adapter, sync engine and `firestore.rules` against the local Firebase Auth + Firestore emulator: Dad's number creates the shop, Mom's different number joins the same shop, live sync both ways with who did it, signing in again with the same number returns the same login, the "this phone already has data" choice, and signed-out visitors blocked. Needs Java 21.
+- **Emulator test** (`npm run test:emulator`) runs the real phone-number login, Firestore adapter, sync engine and `firestore.rules` against the local Firebase Auth + Firestore emulator: Dad's number creates the shop, Mom's different number joins the same shop, live sync both ways with who did it, signing in again with the same number returns the same login, the "this phone already has data" choice, a number not on the family list refused ("not on the family list"), nobody able to read `members`, and signed-out visitors blocked. Needs Java 21.
 - **Manual QA** on a real Android phone and iPhone before each install: see the checklists in [MILESTONES.md](MILESTONES.md).
 - **Accessibility:** touch targets of at least 44pt (tiles 112pt tall, status buttons 68pt), white text on dark tile colours, and accessible labels on every button.
 
@@ -314,11 +316,14 @@ These are implemented in `src/lib/summary.ts`, `src/lib/balance.ts` and `src/lib
 | Data loss if a phone is lost or reset | With family sync on, the shop's data is in the cloud and on every phone. Still export a weekly backup: a mistaken delete syncs everywhere |
 | Two phones save an order at the same instant | Both orders are kept; they may share an order number. Accepted as cosmetic |
 | A phone's clock is wrong | "Newest edit wins" uses phone time. Keep automatic date and time on every phone |
-| Weak sign-in security (accepted for family use) | Anyone who has the app and types any 10-digit number can read and change the shop's data; there is no PIN, SMS or member list. Accepted because only the family has the app. Don't share the app outside the family; if it is ever made public, redesign sign-in first (per-person PINs or SMS codes, and member lists in the rules) |
+| Simple sign-in (accepted for family use) | Only numbers in `members` get in, so strangers with the public code or the old settings from the git history get nothing (they could still create empty Firebase logins; harmless). There is still no PIN or SMS: someone who knows a family member's number and has the private settings could sign in as them. Accepted for family use. If the app is ever shared outside the family, add per-person PINs or SMS codes first |
+| Old Firebase settings are in a public commit | The family list in the rules makes them useless to strangers. Optional: restrict the API key in the Google Cloud console (APIs & Services → Credentials) |
+| A family member's number missing from `members`, or rules published before the members were added | The app says the number isn't on the family list. Add the document in `members` (FIREBASE_SETUP.md, step 4); remove someone by deleting theirs |
+| An `.apk` built with `.env.local` contains the family's settings | Don't attach it to a public GitHub release; share it with the family directly |
 | The wrong phone signs in first | Handled: only orders and money entries count as shop data, so the shop phone still uploads everything and its menu replaces an empty phone's placeholder menu (tested) |
 | `SHOP_ID`, salt or email format changed after use | Existing logins and data would no longer be found. Never change them in `src/sync/shopLogin.ts` once the family uses sync |
 | Free plan limits (20k writes / 50k reads a day, 1 GiB) | Far above a restaurant's use. If ever reached, phones keep working offline and catch up the next day. The Spark plan never charges |
-| Firebase settings not filled in, or old build installed | Settings → Family sync says it isn't set up. The app still works on one phone |
+| `.env.local` missing or not filled in, or old build installed | Settings → Family sync says it isn't set up. The app still works on one phone |
 | Restaurant open past midnight | Late orders count toward the next calendar day. Add a "day ends at" setting if needed |
 | Tapping the wrong status in a rush | The toast after saving has an EDIT button. Status can also be changed from the Orders list |
 | iPhone install with a free Apple personal team expires after 7 days | Reinstall weekly from the Mac, or pay for an Apple Developer account ($99/yr) for TestFlight. Android `.apk` install is free |

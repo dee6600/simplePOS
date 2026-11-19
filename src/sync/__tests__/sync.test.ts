@@ -9,6 +9,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { computeBalance } from '../../lib/balance';
 import { openTestDb } from '../../test/nodeSqlite';
 import { listMenu, updateMenuItem } from '../../db/menu';
+import { buildBackup, restoreBackup } from '../../db/backup';
 import { migrateDb } from '../../db/migrate';
 import { addMoneyEntry, getBalanceSums, listMoneyEntries } from '../../db/money';
 import { createOrder, listOrders, setOrderDeleted, setOrderStatus, updateOrder } from '../../db/orders';
@@ -19,6 +20,9 @@ import { attachToShop } from '../connectShop';
 import { SyncEngine } from '../engine';
 import type { CollectionName, IncomingDoc, RemoteDoc, RemoteStore } from '../remote';
 
+jest.mock('expo-document-picker', () => ({}));
+jest.mock('expo-file-system', () => ({}));
+jest.mock('expo-sharing', () => ({}));
 jest.mock('expo-crypto', () => ({ randomUUID: () => jest.requireActual('node:crypto').randomUUID() }));
 
 const ALL = { start: 0, end: Number.MAX_SAFE_INTEGER };
@@ -281,4 +285,37 @@ test('an empty phone signing in first never makes the real shop phone lose its d
   expect((await listMenu(mom.db)).map((m) => m.name)[0]).toBe('KHUSHKA');
   expect(await listOrders(mom.db, ALL)).toHaveLength(1);
   for (const p of [dad, shree, mom]) p.engine.stop();
+});
+
+test('"Add this phone\'s orders" skips orders the shop already has (e.g. imported from this phone\'s backup)', async () => {
+  const cloud = new FakeCloud();
+  // The shop phone's data, before v1.2: two orders yesterday.
+  const dad = await phone(cloud, 'Dad');
+  await createOrder(dad.db, { lines: [await lineFor(dad.db, 0, 1)], status: 'cash', orderType: null });
+  await createOrder(dad.db, { lines: [await lineFor(dad.db, 1, 2)], status: 'upi', orderType: null });
+  const v1Backup = JSON.parse(JSON.stringify(await buildBackup(dad.db)));
+
+  // Those orders were imported into the shop from the backup (old file: no uids, so they get new ones).
+  const importer = await phone(cloud, 'Import');
+  for (const t of ['menu_items', 'orders', 'money_entries'] as const) {
+    for (const row of v1Backup[t] ?? []) delete row.uid;
+  }
+  await restoreBackup(importer.db, { ...v1Backup, version: 1 });
+  await prepareCreate(importer.db, 'main', '');
+  await importer.engine.start();
+  await settle(importer);
+
+  // Meanwhile Dad took a new order today, then signs in and keeps his data.
+  await createOrder(dad.db, { lines: [await lineFor(dad.db, 5, 3)], status: 'cash', orderType: null });
+  expect(await attachToShop(dad.db, cloud.store(), '919876543210', 'ask')).toMatchObject({ status: 'choose' });
+  expect(await attachToShop(dad.db, cloud.store(), '919876543210', 'keepLocal')).toMatchObject({ status: 'connected' });
+  await dad.engine.start();
+  await settle(importer, dad);
+
+  for (const p of [dad, importer]) {
+    expect((await listOrders(p.db, ALL)).map((o) => o.total).sort((a, b) => a - b)).toEqual([60, 120, 400]);
+  }
+  expect(cloud.count('orders')).toBe(3);
+  importer.engine.stop();
+  dad.engine.stop();
 });

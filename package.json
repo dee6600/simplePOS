@@ -41,7 +41,8 @@
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
-    "test:emulator": "npx firebase-tools@latest emulators:exec --only auth,firestore --project demo-simplepos \"jest --config jest.emulator.config.js\""
+    "test:emulator": "npx firebase-tools@latest emulators:exec --only auth,firestore --project demo-simplepos \"jest --config jest.emulator.config.js\"",
+    "import-backup": "jest --config jest.emulator.config.js --testMatch \"<rootDir>/scripts/*.run.ts\" --verbose=false"
   },
   "private": true,
   "jest": {

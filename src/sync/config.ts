@@ -1,16 +1,15 @@
 /**
- * Firebase project settings. Fill these in from:
- * Firebase console → Project settings → General → Your apps → Web app → "SDK setup and configuration" → Config.
- * These values are not secret (they identify the project; the security rules protect the data).
- * See FIREBASE_SETUP.md.
+ * Firebase project settings come from the private `.env.local` file (never committed; see FIREBASE_SETUP.md),
+ * so the public code is not connected to any family's shop. Without the file, sync is off and the app
+ * works on one phone only. Expo builds the values into the app (they must be read as written below).
  */
 export const firebaseConfig = {
-  apiKey: "AIzaSyCFQkauztuHxd7UJVhhqid1AJgsdH06lDY",
-  authDomain: "reddys-biryani-pos.firebaseapp.com",
-  projectId: "reddys-biryani-pos",
-  storageBucket: "reddys-biryani-pos.firebasestorage.app",
-  messagingSenderId: "377903450726",
-  appId: "1:377903450726:web:8ca1ccdbdae345ac33fba7"
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? '',
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? '',
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? '',
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ?? '',
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? '',
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID ?? '',
 };
 
 /**

@@ -1,10 +1,27 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // The family's shop. Any family member signed in to the app (phone number login) can read and write.
-    // Signed-out visitors can't. Deliberately simple, as the family asked.
+
+    // Family members: one document per allowed phone number, e.g. members/919876543210 { name: "Dad" }.
+    // Added by the owner in the Firebase console only; the app can never read or change this list.
+    match /members/{phone} {
+      allow read, write: if false;
+    }
+
+    // The signed-in person's phone number (the app signs in as <91number>@family.simplepos.app).
+    function phone() {
+      return request.auth.token.email.split('@')[0];
+    }
+
+    function isFamily() {
+      return request.auth != null
+        && request.auth.token.email.matches('^91[0-9]{10}@family[.]simplepos[.]app$')
+        && exists(/databases/$(database)/documents/members/$(phone()));
+    }
+
+    // The family's shop: only phone numbers on the members list can read or write.
     match /shops/{shopId}/{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isFamily();
     }
   }
 }

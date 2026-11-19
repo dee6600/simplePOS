@@ -35,10 +35,11 @@ export function FamilySyncSection() {
         Alert.alert(
           'This phone already has data',
           `This phone has ${result.localCount} orders/money entries, and the family's shop already has data. ` +
-            'Usually you want only the shop\'s data. Export a backup first if you are not sure.',
+            '"Add this phone\'s orders" uploads only the ones the shop doesn\'t have yet. "Use shop data only" ' +
+            'removes this phone\'s entries. Export a backup first if you are not sure.',
           [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Also add this phone\'s data', onPress: () => connect('keepLocal') },
+            { text: 'Add this phone\'s orders', onPress: () => connect('keepLocal') },
             { text: 'Use shop data only', style: 'destructive', onPress: () => connect('discardLocal') },
           ],
         );
