@@ -5,6 +5,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
+import { FamilySyncSection } from '../../components/FamilySyncSection';
 import { MenuItemModal } from '../../components/MenuItemModal';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useToast } from '../../components/Toast';
@@ -15,6 +16,7 @@ import { formatDayShort } from '../../lib/dates';
 import { emitDataChanged } from '../../lib/events';
 import { formatRupees } from '../../lib/format';
 import type { MenuItem, Settings } from '../../lib/types';
+import { useSync } from '../../sync/SyncProvider';
 import { colors, radius } from '../../theme';
 
 export default function SettingsScreen() {
@@ -25,6 +27,7 @@ export default function SettingsScreen() {
   const [name, setName] = useState(DEFAULT_SETTINGS.restaurantName);
   const [editing, setEditing] = useState<MenuItem | 'new' | null>(null);
   const [busy, setBusy] = useState<'export' | 'restore' | null>(null);
+  const { connected } = useSync();
 
   const load = useCallback(async () => {
     const [m, s] = await Promise.all([listMenu(db), getSettings(db)]);
@@ -42,6 +45,7 @@ export default function SettingsScreen() {
   const toggleOrderType = async (value: boolean) => {
     setSettings((s) => ({ ...s, showOrderType: value }));
     await saveSetting(db, 'show_order_type', value ? '1' : '0');
+    emitDataChanged();
   };
 
   const saveName = async () => {
@@ -51,6 +55,7 @@ export default function SettingsScreen() {
       return;
     }
     await saveSetting(db, 'restaurant_name', trimmed);
+    emitDataChanged();
     setSettings((s) => ({ ...s, restaurantName: trimmed }));
     toast({ tone: 'success', message: 'Restaurant name saved' });
   };
@@ -58,6 +63,7 @@ export default function SettingsScreen() {
   const move = async (id: number, dir: -1 | 1) => {
     await moveMenuItem(db, id, dir);
     await load();
+    emitDataChanged();
   };
 
   const doExport = async () => {
@@ -72,6 +78,14 @@ export default function SettingsScreen() {
   };
 
   const doRestore = async () => {
+    if (connected) {
+      Alert.alert(
+        'Sign out of family sync first',
+        'Restoring a backup replaces this phone\'s data. To avoid mixing it into the family\'s shared data, ' +
+          'tap "Sign out" under Family sync first.',
+      );
+      return;
+    }
     setBusy('restore');
     try {
       const data = await pickBackup();
@@ -111,6 +125,8 @@ export default function SettingsScreen() {
     <View style={{ flex: 1 }}>
       <ScreenHeader title="Settings" />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <FamilySyncSection />
+
         <Section title="Menu" hint="Tap an item to change its name, price or colour.">
           {menu.map((m, i) => (
             <View key={m.id} style={styles.menuRow}>
@@ -164,7 +180,7 @@ export default function SettingsScreen() {
 
         <Section
           title="Backup"
-          hint="Orders are saved only on this phone. Export a backup every week and send it to WhatsApp or Google Drive, so nothing is lost if the phone is lost or changed."
+          hint="Export a backup every week and send it to WhatsApp or Google Drive. With family sync on, the data is also kept in the shop's cloud."
         >
           <Pressable onPress={doExport} disabled={!!busy} style={[styles.bigBtn, { backgroundColor: colors.primary }]}>
             {busy === 'export' ? <ActivityIndicator color={colors.white} /> : <Ionicons name="share-outline" size={20} color={colors.white} />}
@@ -186,11 +202,13 @@ export default function SettingsScreen() {
           if (editing === 'new') await addMenuItem(db, input);
           else if (editing) await updateMenuItem(db, editing.id, input);
           await load();
+          emitDataChanged();
           toast({ tone: 'success', message: `${input.name} saved` });
         }}
         onDelete={async (item) => {
           await deleteMenuItem(db, item.id);
           await load();
+          emitDataChanged();
           toast({ message: `${item.name} deleted` });
         }}
       />

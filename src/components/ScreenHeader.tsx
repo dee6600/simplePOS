@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors } from '../theme';
+import { SyncBadge } from './SyncBadge';
 
 type Props = {
   title: string;
@@ -30,6 +31,7 @@ export function ScreenHeader({ title, subtitle, onBack, right }: Props) {
             {subtitle}
           </Text>
         ) : null}
+        <SyncBadge />
       </View>
       {right}
     </View>

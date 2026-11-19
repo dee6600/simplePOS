@@ -8,8 +8,10 @@ import { PeriodNav } from '../../components/PeriodNav';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { Segmented } from '../../components/Segmented';
 import { listMenu } from '../../db/menu';
+import { getBalanceSums, listMoneyEntries } from '../../db/money';
 import { listOrders } from '../../db/orders';
 import { DEFAULT_SETTINGS, getSettings } from '../../db/settings';
+import { computeBalance, type Balance } from '../../lib/balance';
 import { formatDayShort, isLatestPeriod, periodLabel, periodRange, periodStart, shiftPeriod, type Period } from '../../lib/dates';
 import { useDataChanged } from '../../lib/events';
 import { formatRupees } from '../../lib/format';
@@ -25,6 +27,7 @@ export default function SummaryScreen() {
   const [offset, setOffset] = useState(0);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [balance, setBalance] = useState<Balance | null>(null);
   const requestId = useRef(0);
 
   const anchor = shiftPeriod(period, new Date(), offset);
@@ -33,9 +36,12 @@ export default function SummaryScreen() {
   const load = useCallback(async () => {
     const id = ++requestId.current;
     const range = periodRange(period, shiftPeriod(period, new Date(), offset));
-    const [orders, menu, s] = await Promise.all([listOrders(db, range), listMenu(db), getSettings(db)]);
+    const [orders, menu, s, entries, sums] = await Promise.all([
+      listOrders(db, range), listMenu(db), getSettings(db), listMoneyEntries(db, range), getBalanceSums(db),
+    ]);
     if (id !== requestId.current) return;
-    setSummary(summarize(orders, menu.map((m) => m.id)));
+    setSummary(summarize(orders, menu.map((m) => m.id), entries));
+    setBalance(computeBalance(sums));
     setSettings(s);
   }, [db, period, offset]);
 
@@ -60,6 +66,7 @@ export default function SummaryScreen() {
         periodLabel: label,
         showOrderType: settings.showOrderType,
         showDays: period !== 'day',
+        balance: balance ?? undefined,
       }),
     }).catch(() => {});
   };
@@ -117,6 +124,16 @@ export default function SummaryScreen() {
               <Stat label="Pending" value={s.pending} count={s.pendingCount} color={STATUS.pending.color} bg={STATUS.pending.bg} />
             </View>
 
+            <View style={styles.statRow}>
+              <Stat label="Expenses" value={s.expenses} count={s.expenseCount} color="#B91C1C" bg="#FEE2E2" unit="entry" />
+              <View style={[styles.stat, styles.profit]}>
+                <Text style={[styles.statLabel, { color: colors.white }]}>Profit (sales − expenses)</Text>
+                <Text style={[styles.statValue, { color: s.profit < 0 ? '#FCA5A5' : colors.white }]} numberOfLines={1} adjustsFontSizeToFit>
+                  {formatRupees(s.profit)}
+                </Text>
+              </View>
+            </View>
+
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Plates / items sold</Text>
               {s.items.length === 0 ? (
@@ -154,6 +171,52 @@ export default function SummaryScreen() {
               </View>
             )}
 
+            {s.expenseCount > 0 && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Expenses</Text>
+                {s.expensesByCategory.map((c) => (
+                  <View key={c.category} style={styles.itemRow}>
+                    <Text style={styles.itemName}>{c.category}</Text>
+                    <Text style={styles.itemQty}>{c.count}×</Text>
+                    <Text style={styles.itemAmount}>{formatRupees(c.amount)}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {(s.moneyIn > 0 || s.moneyOut > 0) && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Lump sums</Text>
+                <View style={styles.itemRow}>
+                  <Text style={styles.itemName}>Money added</Text>
+                  <Text style={[styles.itemAmount, { color: '#15803D' }]}>+{formatRupees(s.moneyIn)}</Text>
+                </View>
+                <View style={styles.itemRow}>
+                  <Text style={styles.itemName}>Money taken out</Text>
+                  <Text style={styles.itemAmount}>−{formatRupees(s.moneyOut)}</Text>
+                </View>
+                <Text style={styles.muted}>Not counted in profit. See the Money tab for who added each one.</Text>
+              </View>
+            )}
+
+            {balance && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Balance now</Text>
+                <View style={styles.itemRow}>
+                  <Text style={styles.itemName}>Cash in hand</Text>
+                  <Text style={styles.itemAmount}>{formatRupees(balance.cash)}</Text>
+                </View>
+                <View style={styles.itemRow}>
+                  <Text style={styles.itemName}>Bank (UPI)</Text>
+                  <Text style={styles.itemAmount}>{formatRupees(balance.bank)}</Text>
+                </View>
+                <View style={styles.itemRow}>
+                  <Text style={[styles.itemName, { fontWeight: '900' }]}>Total</Text>
+                  <Text style={[styles.itemAmount, { fontWeight: '900' }]}>{formatRupees(balance.total)}</Text>
+                </View>
+              </View>
+            )}
+
             {period !== 'day' && s.days.length > 0 && (
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>Day by day</Text>
@@ -165,7 +228,10 @@ export default function SummaryScreen() {
                   >
                     <Text style={styles.itemName}>{formatDayShort(d.date)}</Text>
                     <Text style={styles.itemQty}>{d.orderCount} orders</Text>
-                    <Text style={styles.itemAmount}>{formatRupees(d.total)}</Text>
+                    <View>
+                      <Text style={styles.itemAmount}>{formatRupees(d.total)}</Text>
+                      {d.expenses > 0 && <Text style={styles.dayExpense}>−{formatRupees(d.expenses)}</Text>}
+                    </View>
                     <Ionicons name="chevron-forward" size={18} color={colors.muted} />
                   </Pressable>
                 ))}
@@ -178,14 +244,17 @@ export default function SummaryScreen() {
   );
 }
 
-function Stat({ label, value, count, color, bg }: { label: string; value: number; count: number; color: string; bg: string }) {
+function Stat({
+  label, value, count, color, bg, unit = 'order',
+}: { label: string; value: number; count: number; color: string; bg: string; unit?: 'order' | 'entry' }) {
+  const units = unit === 'entry' ? (count === 1 ? 'entry' : 'entries') : count === 1 ? 'order' : 'orders';
   return (
     <View style={[styles.stat, { backgroundColor: bg }]}>
       <Text style={[styles.statLabel, { color }]}>{label}</Text>
       <Text style={[styles.statValue, { color }]} numberOfLines={1} adjustsFontSizeToFit>
         {formatRupees(value)}
       </Text>
-      <Text style={[styles.statCount, { color }]}>{count} order{count === 1 ? '' : 's'}</Text>
+      <Text style={[styles.statCount, { color }]}>{count} {units}</Text>
     </View>
   );
 }
@@ -217,4 +286,6 @@ const styles = StyleSheet.create({
   itemQty: { fontSize: 16, color: colors.muted, fontWeight: '700' },
   itemAmount: { fontSize: 16, color: colors.text, fontWeight: '800', minWidth: 72, textAlign: 'right' },
   muted: { color: colors.muted, fontSize: 15 },
+  profit: { backgroundColor: colors.text, flex: 2 },
+  dayExpense: { fontSize: 13, color: '#B91C1C', fontWeight: '700', textAlign: 'right' },
 });

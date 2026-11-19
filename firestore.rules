@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // The family's shop. Any family member signed in to the app (phone number login) can read and write.
+    // Signed-out visitors can't. Deliberately simple, as the family asked.
+    match /shops/{shopId}/{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

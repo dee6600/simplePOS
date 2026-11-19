@@ -19,13 +19,14 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
-        tabBarLabelStyle: { fontSize: 13, fontWeight: '700' },
+        tabBarLabelStyle: { fontSize: 12, fontWeight: '700' },
         tabBarStyle: { backgroundColor: colors.card },
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >
       <Tabs.Screen name="index" options={tab('New Order', 'add-circle-outline', 'add-circle')} />
       <Tabs.Screen name="orders" options={tab('Orders', 'receipt-outline', 'receipt')} />
+      <Tabs.Screen name="money" options={tab('Money', 'wallet-outline', 'wallet')} />
       <Tabs.Screen name="summary" options={tab('Summary', 'bar-chart-outline', 'bar-chart')} />
       <Tabs.Screen name="settings" options={tab('Settings', 'settings-outline', 'settings')} />
     </Tabs>

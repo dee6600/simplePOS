@@ -2,13 +2,15 @@
   "expo": {
     "name": "SimplePOS",
     "slug": "simplePOS",
-    "version": "1.0.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.simplepos.app"
+      "bundleIdentifier": "com.dee6600.simplepos",
+      "appleTeamId": "B58587YAB5",
+      "buildNumber": "2"
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +20,8 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.simplepos.app"
+      "package": "com.simplepos.app",
+      "versionCode": 2
     },
     "web": {
       "favicon": "./assets/favicon.png"

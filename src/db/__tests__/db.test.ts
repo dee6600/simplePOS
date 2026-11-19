@@ -4,10 +4,6 @@
  * Runs the real SQL in src/db against Node's built-in SQLite through a small adapter
  * that mimics the parts of expo-sqlite's async API we use.
  */
-/// <reference types="node" />
-import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
-import type { SQLiteDatabase } from 'expo-sqlite';
-
 import { buildBackup, restoreBackup } from '../backup';
 import { addMenuItem, deleteMenuItem, listMenu, moveMenuItem, updateMenuItem } from '../menu';
 import { DEFAULT_MENU, migrateDb } from '../migrate';
@@ -15,41 +11,12 @@ import { createOrder, getOrder, listOrders, setOrderDeleted, setOrderStatus, upd
 import { getSettings, saveSetting } from '../settings';
 import { periodRange } from '../../lib/dates';
 import type { OrderLine } from '../../lib/types';
+import { openTestDb as openDb } from '../../test/nodeSqlite';
 
 jest.mock('expo-document-picker', () => ({}));
 jest.mock('expo-file-system', () => ({}));
 jest.mock('expo-sharing', () => ({}));
-
-type Params = SQLInputValue[];
-const norm = (p: unknown[]): Params => (p.length === 1 && Array.isArray(p[0]) ? p[0] : p) as Params;
-
-function openDb(): SQLiteDatabase {
-  const raw = new DatabaseSync(':memory:');
-  const db = {
-    execAsync: async (sql: string) => raw.exec(sql),
-    runAsync: async (sql: string, ...p: unknown[]) => {
-      const r = raw.prepare(sql).run(...norm(p));
-      return { lastInsertRowId: Number(r.lastInsertRowid), changes: Number(r.changes) };
-    },
-    getFirstAsync: async (sql: string, ...p: unknown[]) => raw.prepare(sql).get(...norm(p)) ?? null,
-    getAllAsync: async (sql: string, ...p: unknown[]) => raw.prepare(sql).all(...norm(p)),
-    withTransactionAsync: async (task: () => Promise<void>) => {
-      raw.exec('BEGIN');
-      try {
-        await task();
-        raw.exec('COMMIT');
-      } catch (e) {
-        raw.exec('ROLLBACK');
-        throw e;
-      }
-    },
-    prepareAsync: async (sql: string) => {
-      const st = raw.prepare(sql);
-      return { executeAsync: async (...p: unknown[]) => st.run(...norm(p)), finalizeAsync: async () => {} };
-    },
-  };
-  return db as unknown as SQLiteDatabase;
-}
+jest.mock('expo-crypto', () => ({ randomUUID: () => jest.requireActual('node:crypto').randomUUID() }));
 
 const NOV18_NOON = new Date(2026, 10, 18, 12).getTime();
 let clock = NOV18_NOON;

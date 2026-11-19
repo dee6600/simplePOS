@@ -1,9 +1,11 @@
+import type { Balance } from './balance';
 import { dayKey, formatDayShort, periodStart } from './dates';
 import { formatRupees } from './format';
-import type { Order } from './types';
+import type { MoneyEntry, Order } from './types';
 
 export type ItemTotal = { key: string; name: string; qty: number; amount: number };
-export type DayTotal = { key: string; date: Date; orderCount: number; total: number };
+export type DayTotal = { key: string; date: Date; orderCount: number; total: number; expenses: number };
+export type CategoryTotal = { category: string; amount: number; count: number };
 
 export type Summary = {
   orderCount: number;
@@ -19,23 +21,43 @@ export type Summary = {
   dineIn: number;
   parcel: number;
   untagged: number;
-  /** Days that have at least one order, newest first. */
+  /** Money spent on the business in this period. */
+  expenses: number;
+  expenseCount: number;
+  expensesByCategory: CategoryTotal[];
+  /** Sales − expenses (pending orders count as sales). */
+  profit: number;
+  /** Lump sums added to / taken out of the balance (not part of profit). */
+  moneyIn: number;
+  moneyOut: number;
+  /** Days that have at least one order or expense, newest first. */
   days: DayTotal[];
 };
 
 /**
- * Aggregate orders into totals. Deleted orders are ignored.
+ * Aggregate orders (and money entries) into totals. Deleted rows are ignored.
  * `menuOrder` is the list of menu item ids in display order, used to sort the per-item rows.
  * Lines are grouped by menu item id, so a price or name change mid-month still counts as one item.
  */
-export function summarize(orders: Order[], menuOrder: number[] = []): Summary {
+export function summarize(orders: Order[], menuOrder: number[] = [], entries: MoneyEntry[] = []): Summary {
   const s: Summary = {
     orderCount: 0, total: 0,
     cash: 0, cashCount: 0, upi: 0, upiCount: 0, pending: 0, pendingCount: 0,
-    itemCount: 0, items: [], dineIn: 0, parcel: 0, untagged: 0, days: [],
+    itemCount: 0, items: [], dineIn: 0, parcel: 0, untagged: 0,
+    expenses: 0, expenseCount: 0, expensesByCategory: [], profit: 0, moneyIn: 0, moneyOut: 0,
+    days: [],
   };
   const items = new Map<string, ItemTotal & { seenAt: number; menuId: number | null }>();
   const days = new Map<string, DayTotal>();
+  const dayFor = (ts: number) => {
+    const dk = dayKey(ts);
+    let day = days.get(dk);
+    if (!day) {
+      day = { key: dk, date: periodStart('day', new Date(ts)), orderCount: 0, total: 0, expenses: 0 };
+      days.set(dk, day);
+    }
+    return day;
+  };
 
   for (const o of orders) {
     if (o.deleted) continue;
@@ -63,15 +85,29 @@ export function summarize(orders: Order[], menuOrder: number[] = []): Summary {
       s.itemCount += line.qty;
     }
 
-    const dk = dayKey(o.created_at);
-    let day = days.get(dk);
-    if (!day) {
-      day = { key: dk, date: periodStart('day', new Date(o.created_at)), orderCount: 0, total: 0 };
-      days.set(dk, day);
-    }
+    const day = dayFor(o.created_at);
     day.orderCount += 1;
     day.total += o.total;
   }
+
+  const categories = new Map<string, CategoryTotal>();
+  for (const e of entries) {
+    if (e.deleted) continue;
+    if (e.kind === 'in') s.moneyIn += e.amount;
+    else if (e.kind === 'out') s.moneyOut += e.amount;
+    else {
+      s.expenses += e.amount;
+      s.expenseCount += 1;
+      const name = e.category || 'Other';
+      const c = categories.get(name) ?? { category: name, amount: 0, count: 0 };
+      c.amount += e.amount;
+      c.count += 1;
+      categories.set(name, c);
+      dayFor(e.created_at).expenses += e.amount;
+    }
+  }
+  s.expensesByCategory = [...categories.values()].sort((a, b) => b.amount - a.amount);
+  s.profit = s.total - s.expenses;
 
   const rank = (menuId: number | null) => {
     const i = menuId == null ? -1 : menuOrder.indexOf(menuId);
@@ -87,7 +123,7 @@ export function summarize(orders: Order[], menuOrder: number[] = []): Summary {
 /** Plain-text version for sharing on WhatsApp/SMS. */
 export function summaryText(
   s: Summary,
-  opts: { restaurantName: string; periodLabel: string; showOrderType: boolean; showDays: boolean },
+  opts: { restaurantName: string; periodLabel: string; showOrderType: boolean; showDays: boolean; balance?: Balance },
 ): string {
   const out = [
     `*${opts.restaurantName}*`,
@@ -106,9 +142,24 @@ export function summaryText(
   if (opts.showOrderType) {
     out.push('', `Dine-in: ${s.dineIn} · Parcel: ${s.parcel}`);
   }
+  if (s.expenseCount) {
+    out.push('', `Expenses: ${formatRupees(s.expenses)}`);
+    for (const c of s.expensesByCategory) out.push(`${c.category}: ${formatRupees(c.amount)}`);
+  }
+  out.push('', `*Profit (sales − expenses): ${formatRupees(s.profit)}*`);
+  if (s.moneyIn || s.moneyOut) {
+    out.push(`Money added: ${formatRupees(s.moneyIn)} · Taken out: ${formatRupees(s.moneyOut)}`);
+  }
+  if (opts.balance) {
+    const b = opts.balance;
+    out.push('', `Balance now: Cash ${formatRupees(b.cash)} · Bank ${formatRupees(b.bank)} · Total ${formatRupees(b.total)}`);
+  }
   if (opts.showDays && s.days.length) {
     out.push('', 'Day by day:');
-    for (const d of s.days) out.push(`${formatDayShort(d.date)}: ${d.orderCount} orders, ${formatRupees(d.total)}`);
+    for (const d of s.days) {
+      const exp = d.expenses ? `, expenses ${formatRupees(d.expenses)}` : '';
+      out.push(`${formatDayShort(d.date)}: ${d.orderCount} orders, ${formatRupees(d.total)}${exp}`);
+    }
   }
   return out.join('\n');
 }

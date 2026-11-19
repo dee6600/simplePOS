@@ -6,7 +6,9 @@ let nextId = 1;
 function order(partial: Partial<Order> & { items: OrderLine[] }): Order {
   const total = partial.items.reduce((s, l) => s + l.price * l.qty, 0);
   return {
-    id: nextId++,
+    id: nextId,
+    uid: `u${nextId++}`,
+    created_by: '',
     order_no: 1,
     created_at: new Date(2026, 10, 18, 13).getTime(),
     updated_at: 0,
