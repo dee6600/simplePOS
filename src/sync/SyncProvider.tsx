@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { AppState } from 'react-native';
 
 import { getDeviceSetting, setDeviceSetting } from '../db/settings';
+import { emitRemoteChanges, type RemoteChange } from '../lib/changes';
 import { emitDataChanged, useDataChanged } from '../lib/events';
 import { isFirebaseConfigured } from './config';
 import { prepareDisconnect } from './connect';
@@ -24,6 +25,9 @@ type SyncContextValue = {
   /** This phone's user ("Dad", "Mom"…), recorded on every order, expense and lump sum. */
   userName: string | null;
   setUserName: (name: string) => Promise<void>;
+  /** Show an alert on this phone when someone else adds, changes or deletes something (default on). */
+  notifyChanges: boolean;
+  setNotifyChanges: (on: boolean) => Promise<void>;
   /** Sign in with this person's number and connect to the family's shop. */
   connect: (phone: string, mode: ConnectMode) => Promise<ConnectResult>;
   signOut: () => Promise<void>;
@@ -50,6 +54,12 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const [myPhone, setMyPhone] = useState<string | null>(null);
   const [userName, setUserNameState] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [notifyChanges, setNotifyState] = useState(true);
+  // Read by the sync engine's callback, which is created once per connection.
+  const alertPrefs = useRef({ on: true, me: '' });
+  useEffect(() => {
+    alertPrefs.current = { on: notifyChanges, me: userName ?? '' };
+  }, [notifyChanges, userName]);
 
   const stopEngine = useCallback(() => {
     engineRef.current?.stop();
@@ -64,7 +74,11 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       engineRef.current?.stop();
       const engine = new SyncEngine(db, new FirestoreRemote(fb.firestore, shopId), {
         onStatus: (s) => setStatus({ ...s, error: s.error ? friendlyMessage(new Error(s.error)) : null }),
-        onRemoteChange: emitDataChanged,
+        onRemoteChange: (changes: RemoteChange[]) => {
+          emitDataChanged();
+          const { on, me } = alertPrefs.current;
+          if (on) emitRemoteChanges(changes.filter((c) => !me || c.actor !== me));
+        },
       });
       engineRef.current = engine;
       setConnected(true);
@@ -78,6 +92,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     (async () => {
       setUserNameState(await getDeviceSetting(db, 'user_name'));
       setMyPhone(await getDeviceSetting(db, 'my_phone'));
+      setNotifyState((await getDeviceSetting(db, 'notify_changes')) !== '0');
       setLoaded(true);
     })();
   }, [db]);
@@ -116,6 +131,14 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       await setDeviceSetting(db, 'user_name', trimmed);
       setUserNameState(trimmed);
       if (engineRef.current) reportPhone(db, SHOP_ID);
+    },
+    [db],
+  );
+
+  const setNotifyChanges = useCallback(
+    async (on: boolean) => {
+      setNotifyState(on);
+      await setDeviceSetting(db, 'notify_changes', on ? '1' : '0');
     },
     [db],
   );
@@ -167,7 +190,20 @@ export function SyncProvider({ children }: { children: ReactNode }) {
 
   return (
     <SyncContext.Provider
-      value={{ configured, connected, myPhone, status, userName, setUserName, connect, signOut, syncNow, listPhones }}
+      value={{
+        configured,
+        connected,
+        myPhone,
+        status,
+        userName,
+        setUserName,
+        notifyChanges,
+        setNotifyChanges,
+        connect,
+        signOut,
+        syncNow,
+        listPhones,
+      }}
     >
       {children}
     </SyncContext.Provider>

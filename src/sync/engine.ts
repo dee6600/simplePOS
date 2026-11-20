@@ -1,6 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { getDeviceSetting, setDeviceSetting } from '../db/settings';
+import type { RemoteChange } from '../lib/changes';
 import { applyIncoming, collectDirty, countDirty, markClean } from './mapping';
 import { COLLECTIONS, type CollectionName, type IncomingDoc, type RemoteStore } from './remote';
 
@@ -9,14 +10,19 @@ export type SyncStatus = { state: SyncState; waiting: number; lastSyncedAt: numb
 
 type Options = {
   onStatus?: (status: SyncStatus) => void;
-  /** Called after changes from another phone were written locally (screens should reload). */
-  onRemoteChange?: () => void;
+  /**
+   * Called after changes from another phone were written locally (screens should reload).
+   * After joining a shop, the first download only reports changes from the last few minutes.
+   */
+  onRemoteChange?: (changes: RemoteChange[]) => void;
   debounceMs?: number;
   retryMs?: number;
 };
 
 /** Re-download a little before the saved cursor; applying a doc twice is harmless. */
 const CURSOR_OVERLAP_MS = 60_000;
+/** On a phone's first download, changes newer than this still raise an alert. */
+const QUIET_RECENT_MS = 10 * 60_000;
 /** 50 × 400 rows per collection per upload round. */
 const MAX_BATCHES_PER_PUSH = 50;
 
@@ -33,6 +39,8 @@ export class SyncEngine {
   private pushAgain = false;
   private applyChain: Promise<void> = Promise.resolve();
   private running = false;
+  /** Collections whose first download is the whole shop (fresh join): don't alert about it. */
+  private quietFirst = new Set<CollectionName>();
   private status: SyncStatus = { state: 'off', waiting: 0, lastSyncedAt: null, error: null };
 
   constructor(
@@ -51,6 +59,8 @@ export class SyncEngine {
     this.setStatus({ state: 'starting', error: null });
     for (const c of COLLECTIONS) {
       const cursor = Number((await getDeviceSetting(this.db, `cursor_${c}`)) ?? 0);
+      if (cursor === 0) this.quietFirst.add(c);
+      else this.quietFirst.delete(c);
       this.unsubs.push(
         this.remote.subscribe(
           c,
@@ -145,7 +155,8 @@ export class SyncEngine {
   private enqueueApply(c: CollectionName, docs: IncomingDoc[]): void {
     this.applyChain = this.applyChain.then(async () => {
       try {
-        const changed = await applyIncoming(this.db, c, docs);
+        const { applied, changes } = await applyIncoming(this.db, c, docs);
+        const quiet = this.quietFirst.delete(c);
         const cursor = Math.max(
           Number((await getDeviceSetting(this.db, `cursor_${c}`)) ?? 0),
           ...docs.map((d) => d.synced_at),
@@ -158,7 +169,11 @@ export class SyncEngine {
           lastSyncedAt: Date.now(),
           error: null,
         });
-        if (changed > 0) this.opts.onRemoteChange?.();
+        if (applied > 0) {
+          // The first download after joining is the shop's history; only the last few minutes are news.
+          const news = quiet ? changes.filter((ch) => ch.at > Date.now() - QUIET_RECENT_MS) : changes;
+          this.opts.onRemoteChange?.(news);
+        }
       } catch (e) {
         this.setStatus({ error: e instanceof Error ? e.message : String(e) });
       }

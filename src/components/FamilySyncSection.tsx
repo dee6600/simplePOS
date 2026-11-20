@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { formatDayShort } from '../lib/dates';
 import { formatTime } from '../lib/format';
@@ -105,6 +105,17 @@ export function FamilySyncSection() {
               </Pressable>
             </View>
           )}
+          <View style={[styles.row, styles.divider]}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.switchLabel}>Alerts when others make changes</Text>
+              <Text style={styles.hint}>
+                {sync.connected
+                  ? 'Shows "Order #12 changed by Mom" at the top while the app is open.'
+                  : 'Works once this phone is signed in to family sync.'}
+              </Text>
+            </View>
+            <Switch value={sync.notifyChanges} onValueChange={sync.setNotifyChanges} />
+          </View>
         </View>
       </View>
 
@@ -218,6 +229,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   label: { fontSize: 15, color: colors.muted, fontWeight: '700', width: 60 },
   value: { fontSize: 18, fontWeight: '800', color: colors.text },
+  divider: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 },
+  switchLabel: { fontSize: 16, fontWeight: '700', color: colors.text },
   input: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: 14, height: 52, fontSize: 18, color: colors.text, backgroundColor: colors.bg },
   chip: { flex: 1, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },

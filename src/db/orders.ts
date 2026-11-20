@@ -10,7 +10,7 @@ import { withTx } from './tx';
 type OrderRow = Omit<Order, 'items'>;
 type ItemRow = OrderLine & { order_id: number };
 
-const ORDER_COLUMNS = 'id, uid, order_no, created_at, updated_at, status, order_type, total, deleted, created_by';
+const ORDER_COLUMNS = 'id, uid, order_no, created_at, updated_at, status, order_type, total, deleted, created_by, updated_by';
 
 export type OrderInput = {
   lines: OrderLine[];
@@ -42,8 +42,8 @@ export async function createOrder(db: SQLiteDatabase, input: OrderInput): Promis
     );
     orderNo = row?.n ?? 1;
     const res = await db.runAsync(
-      `INSERT INTO orders (uid, order_no, created_at, updated_at, status, order_type, total, created_by, dirty)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ${CURRENT_USER_SQL}, 1)`,
+      `INSERT INTO orders (uid, order_no, created_at, updated_at, status, order_type, total, created_by, updated_by, dirty)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ${CURRENT_USER_SQL}, ${CURRENT_USER_SQL}, 1)`,
       newUid(), orderNo, now, now, input.status, input.orderType, linesTotal(input.lines),
     );
     id = res.lastInsertRowId;
@@ -55,7 +55,8 @@ export async function createOrder(db: SQLiteDatabase, input: OrderInput): Promis
 export async function updateOrder(db: SQLiteDatabase, id: number, input: OrderInput): Promise<void> {
   await withTx(db, async () => {
     await db.runAsync(
-      'UPDATE orders SET status = ?, order_type = ?, total = ?, updated_at = ?, dirty = 1 WHERE id = ?',
+      `UPDATE orders SET status = ?, order_type = ?, total = ?, updated_at = ?, updated_by = ${CURRENT_USER_SQL}, dirty = 1
+       WHERE id = ?`,
       input.status, input.orderType, linesTotal(input.lines), Date.now(), id,
     );
     await db.runAsync('DELETE FROM order_items WHERE order_id = ?', id);
@@ -64,13 +65,17 @@ export async function updateOrder(db: SQLiteDatabase, id: number, input: OrderIn
 }
 
 export async function setOrderStatus(db: SQLiteDatabase, id: number, status: PaidStatus): Promise<void> {
-  await db.runAsync('UPDATE orders SET status = ?, updated_at = ?, dirty = 1 WHERE id = ?', status, Date.now(), id);
+  await db.runAsync(
+    `UPDATE orders SET status = ?, updated_at = ?, updated_by = ${CURRENT_USER_SQL}, dirty = 1 WHERE id = ?`,
+    status, Date.now(), id,
+  );
 }
 
 /** Soft delete so it can be undone (and so the delete can sync). Deleted orders are excluded everywhere. */
 export async function setOrderDeleted(db: SQLiteDatabase, id: number, deleted: boolean): Promise<void> {
   await db.runAsync(
-    'UPDATE orders SET deleted = ?, updated_at = ?, dirty = 1 WHERE id = ?', deleted ? 1 : 0, Date.now(), id,
+    `UPDATE orders SET deleted = ?, updated_at = ?, updated_by = ${CURRENT_USER_SQL}, dirty = 1 WHERE id = ?`,
+    deleted ? 1 : 0, Date.now(), id,
   );
 }
 

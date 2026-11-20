@@ -9,6 +9,7 @@ function order(partial: Partial<Order> & { items: OrderLine[] }): Order {
     id: nextId,
     uid: `u${nextId++}`,
     created_by: '',
+    updated_by: '',
     order_no: 1,
     created_at: new Date(2026, 10, 18, 13).getTime(),
     updated_at: 0,

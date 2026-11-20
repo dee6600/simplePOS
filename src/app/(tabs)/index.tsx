@@ -10,7 +10,7 @@ import { listMenu } from '../../db/menu';
 import { createOrder, listOrders, type OrderInput } from '../../db/orders';
 import { DEFAULT_SETTINGS, getSettings } from '../../db/settings';
 import { periodRange } from '../../lib/dates';
-import { emitDataChanged } from '../../lib/events';
+import { emitDataChanged, useDataChanged } from '../../lib/events';
 import { formatRupees, linesTotal } from '../../lib/format';
 import type { MenuItem, Settings } from '../../lib/types';
 import { STATUS } from '../../theme';
@@ -27,6 +27,14 @@ export default function NewOrderScreen() {
     const orders = await listOrders(db, periodRange('day', new Date()));
     setToday({ count: orders.length, total: orders.reduce((s, o) => s + o.total, 0) });
   }, [db]);
+
+  // Orders from other phones update today's count right away (the menu waits for the next visit,
+  // so an order being tapped in is never disturbed).
+  useDataChanged(
+    useCallback(() => {
+      loadToday();
+    }, [loadToday]),
+  );
 
   // Reload whenever the tab is shown, so menu/settings edits show up immediately.
   useFocusEffect(

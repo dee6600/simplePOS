@@ -4,6 +4,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { ByLine } from '../../components/ByLine';
 import { KIND_META, MoneyEntryModal, type MoneyModalTarget } from '../../components/MoneyEntryModal';
 import { PeriodNav } from '../../components/PeriodNav';
 import { ScreenHeader } from '../../components/ScreenHeader';
@@ -150,8 +151,7 @@ export default function MoneyScreen() {
                 </Text>
               ) : null}
               <Text style={styles.entryWho}>
-                {formatTime(e.created_at)} · by {e.created_by || 'unknown'}
-                {e.updated_by && e.updated_by !== e.created_by ? ` · edited by ${e.updated_by}` : ''}
+                {formatTime(e.created_at)} · <ByLine createdBy={e.created_by} updatedBy={e.updated_by} />
               </Text>
             </View>
             <Text style={[styles.entryAmount, { color: KIND_META[e.kind].color }]}>
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   entryTitle: { fontSize: 17, fontWeight: '800', color: colors.text },
   method: { fontSize: 13, fontWeight: '700', color: colors.muted },
   entryNote: { fontSize: 15, color: colors.text, marginTop: 2 },
-  entryWho: { fontSize: 13, color: colors.muted, marginTop: 3 },
+  entryWho: { fontSize: 14, color: colors.muted, marginTop: 3 },
   entryAmount: { fontSize: 19, fontWeight: '900' },
   empty: { textAlign: 'center', color: colors.muted, fontSize: 16, marginTop: 24 },
 });

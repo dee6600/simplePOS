@@ -6,6 +6,8 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { getDeviceSetting, getSettings, setDeviceSetting } from '../db/settings';
 import { withTx } from '../db/tx';
+import type { ChangeKind, RemoteChange } from '../lib/changes';
+import { formatRupees } from '../lib/format';
 import type { CollectionName, IncomingDoc, RemoteDoc } from './remote';
 
 const TABLE: Record<Exclude<CollectionName, 'meta'>, string> = {
@@ -15,8 +17,10 @@ const TABLE: Record<Exclude<CollectionName, 'meta'>, string> = {
 };
 
 const FIELDS = {
-  menu_items: ['uid', 'name', 'price', 'color', 'sort_order', 'active', 'deleted', 'updated_at'],
-  orders: ['uid', 'order_no', 'created_at', 'updated_at', 'status', 'order_type', 'total', 'deleted', 'created_by'],
+  menu_items: ['uid', 'name', 'price', 'color', 'sort_order', 'active', 'deleted', 'updated_at', 'updated_by'],
+  orders: [
+    'uid', 'order_no', 'created_at', 'updated_at', 'status', 'order_type', 'total', 'deleted', 'created_by', 'updated_by',
+  ],
   money: [
     'uid', 'kind', 'created_at', 'updated_at', 'category', 'amount', 'method', 'note', 'created_by', 'updated_by', 'deleted',
   ],
@@ -77,10 +81,35 @@ export async function countDirty(db: SQLiteDatabase): Promise<number> {
 }
 
 const val = (v: unknown) => (v === undefined ? null : (v as string | number | null));
+/** Phones on v1.3 and older don't send updated_by; the column can't be NULL. */
+const fieldVal = (d: Row, f: string) => (f.endsWith('_by') ? String(d[f] ?? '') : val(d[f]));
 
-/** Writes cloud changes into the local database. Returns how many rows changed. */
-export async function applyIncoming(db: SQLiteDatabase, c: CollectionName, docs: IncomingDoc[]): Promise<number> {
-  let changed = 0;
+const KIND: Record<Exclude<CollectionName, 'meta'>, ChangeKind> = { menu_items: 'menu', orders: 'order', money: 'money' };
+
+function changeLabel(c: CollectionName, d: Row): string {
+  if (c === 'orders') return `Order #${d.order_no}`;
+  if (c === 'menu_items') return `Menu: ${d.name}`;
+  const amount = formatRupees(Number(d.amount ?? 0));
+  if (d.kind === 'expense') return d.category ? `Expense ${amount} · ${d.category}` : `Expense ${amount}`;
+  return d.kind === 'in' ? `Add money ${amount}` : `Take out ${amount}`;
+}
+
+/** Null when there's nothing worth telling: added and deleted before this phone saw it, or edited while deleted. */
+function changeAction(wasDeleted: boolean, isDeleted: boolean, isNew: boolean): RemoteChange['action'] | null {
+  if (isNew) return isDeleted ? null : 'added';
+  if (isDeleted) return wasDeleted ? null : 'deleted';
+  return wasDeleted ? 'restored' : 'edited';
+}
+
+/**
+ * Writes cloud changes into the local database. Returns how many rows changed, and what changed in a
+ * form the "Order #12 changed by Mom" alert can show.
+ */
+export async function applyIncoming(
+  db: SQLiteDatabase, c: CollectionName, docs: IncomingDoc[],
+): Promise<{ applied: number; changes: RemoteChange[] }> {
+  let applied = 0;
+  const changes: RemoteChange[] = [];
   await withTx(db, async () => {
     if (c === 'meta') {
       for (const d of docs) {
@@ -96,7 +125,8 @@ export async function applyIncoming(db: SQLiteDatabase, c: CollectionName, docs:
         if (typeof d.show_order_type === 'boolean') await put('show_order_type', d.show_order_type ? '1' : '0');
         await setDeviceSetting(db, 'settings_updated_at', String(d.updated_at));
         await setDeviceSetting(db, 'settings_dirty', '0');
-        changed += 1;
+        applied += 1;
+        changes.push({ kind: 'settings', action: 'edited', localId: null, actor: '', label: 'Shop settings', at: d.updated_at });
       }
       return;
     }
@@ -104,8 +134,8 @@ export async function applyIncoming(db: SQLiteDatabase, c: CollectionName, docs:
     const table = TABLE[c];
     const fields = FIELDS[c];
     for (const d of docs) {
-      const local = await db.getFirstAsync<{ id: number; updated_at: number; dirty: number }>(
-        `SELECT id, updated_at, dirty FROM ${table} WHERE uid = ?`, d.uid,
+      const local = await db.getFirstAsync<{ id: number; updated_at: number; dirty: number; deleted: number }>(
+        `SELECT id, updated_at, dirty, deleted FROM ${table} WHERE uid = ?`, d.uid,
       );
       if (local && d.updated_at < local.updated_at) continue; // our copy is newer; it will upload
       if (local && d.updated_at === local.updated_at) {
@@ -116,13 +146,13 @@ export async function applyIncoming(db: SQLiteDatabase, c: CollectionName, docs:
       if (local) {
         await db.runAsync(
           `UPDATE ${table} SET ${fields.map((f) => `${f} = ?`).join(', ')}, dirty = 0 WHERE id = ?`,
-          ...fields.map((f) => val(d[f])), local.id,
+          ...fields.map((f) => fieldVal(d, f)), local.id,
         );
         id = local.id;
       } else {
         const res = await db.runAsync(
           `INSERT INTO ${table} (${fields.join(', ')}, dirty) VALUES (${fields.map(() => '?').join(', ')}, 0)`,
-          ...fields.map((f) => val(d[f])),
+          ...fields.map((f) => fieldVal(d, f)),
         );
         id = res.lastInsertRowId;
       }
@@ -137,10 +167,17 @@ export async function applyIncoming(db: SQLiteDatabase, c: CollectionName, docs:
           );
         }
       }
-      changed += 1;
+      applied += 1;
+      const action = changeAction(Boolean(local?.deleted), Boolean(d.deleted), !local);
+      if (action) {
+        const actor = action === 'added' && c !== 'menu_items' ? d.created_by : d.updated_by;
+        changes.push({
+          kind: KIND[c], action, localId: id, actor: String(actor ?? ''), label: changeLabel(c, d), at: d.updated_at,
+        });
+      }
     }
 
-    if ((c === 'menu_items' || c === 'orders') && changed > 0) {
+    if ((c === 'menu_items' || c === 'orders') && applied > 0) {
       // Lines without a menu link (e.g. kept when joining the shop) are matched by dish name,
       // so the Summary counts them with the same dish instead of as a separate row.
       await db.execAsync(`
@@ -153,5 +190,5 @@ export async function applyIncoming(db: SQLiteDatabase, c: CollectionName, docs:
       `);
     }
   });
-  return changed;
+  return { applied, changes };
 }

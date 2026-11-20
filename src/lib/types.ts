@@ -33,6 +33,8 @@ export type Order = {
   total: number;
   deleted: number;
   created_by: string;
+  /** Who last changed (or deleted) it. Same as created_by until someone edits it; '' if unknown. */
+  updated_by: string;
   items: OrderLine[];
 };
 

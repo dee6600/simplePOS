@@ -11,9 +11,10 @@ import { openTestDb } from '../../test/nodeSqlite';
 import { listMenu, updateMenuItem } from '../../db/menu';
 import { buildBackup, restoreBackup } from '../../db/backup';
 import { migrateDb } from '../../db/migrate';
-import { addMoneyEntry, getBalanceSums, listMoneyEntries } from '../../db/money';
+import { addMoneyEntry, getBalanceSums, listMoneyEntries, updateMoneyEntry } from '../../db/money';
 import { createOrder, listOrders, setOrderDeleted, setOrderStatus, updateOrder } from '../../db/orders';
 import { getSettings, saveSetting, setDeviceSetting } from '../../db/settings';
+import type { RemoteChange } from '../../lib/changes';
 import { countDirty } from '../mapping';
 import { prepareCreate, prepareJoin } from '../connect';
 import { attachToShop } from '../connectShop';
@@ -65,14 +66,21 @@ class FakeCloud {
   }
 }
 
-type Phone = { db: SQLiteDatabase; engine: SyncEngine; changes: number };
+type Phone = { db: SQLiteDatabase; engine: SyncEngine; changes: number; alerts: RemoteChange[] };
 
 async function phone(cloud: FakeCloud, name: string): Promise<Phone> {
   const db = openTestDb();
   await migrateDb(db);
   await setDeviceSetting(db, 'user_name', name);
-  const p: Phone = { db, engine: null as unknown as SyncEngine, changes: 0 };
-  p.engine = new SyncEngine(db, cloud.store(), { debounceMs: 1, retryMs: 5, onRemoteChange: () => (p.changes += 1) });
+  const p: Phone = { db, engine: null as unknown as SyncEngine, changes: 0, alerts: [] };
+  p.engine = new SyncEngine(db, cloud.store(), {
+    debounceMs: 1,
+    retryMs: 5,
+    onRemoteChange: (changes) => {
+      p.changes += 1;
+      p.alerts.push(...changes);
+    },
+  });
   return p;
 }
 
@@ -318,4 +326,77 @@ test('"Add this phone\'s orders" skips orders the shop already has (e.g. importe
   expect(cloud.count('orders')).toBe(3);
   importer.engine.stop();
   dad.engine.stop();
+});
+
+test('other phones are told what changed and who did it', async () => {
+  const cloud = new FakeCloud();
+  const shop = await phone(cloud, 'Dad');
+  const { id } = await createOrder(shop.db, { lines: [await lineFor(shop.db, 1, 2)], status: 'cash', orderType: null });
+  await prepareCreate(shop.db, 'shop1', 'e');
+  await shop.engine.start();
+  await settle(shop);
+
+  // Joining an hour later: the shop's history downloads quietly.
+  clock += 3_600_000;
+  const mom = await phone(cloud, 'Mom');
+  await prepareJoin(mom.db, 'shop1', 'e', false);
+  await mom.engine.start();
+  await settle(shop, mom);
+  expect(mom.alerts).toEqual([]);
+  expect(await listOrders(mom.db, ALL)).toHaveLength(1);
+
+  const pick = (p: Phone) => p.alerts.splice(0).map(({ kind, action, actor, label }) => ({ kind, action, actor, label }));
+
+  // Dad edits his order, adds an expense; Mom is told, and the alert opens Mom's copy of the order.
+  await updateOrder(shop.db, id, { lines: [await lineFor(shop.db, 1, 3)], status: 'upi', orderType: null });
+  await addMoneyEntry(shop.db, { kind: 'expense', amount: 900, method: 'cash', category: 'Oil', note: '' });
+  shop.engine.schedulePush();
+  await settle(shop, mom);
+  const momOrderId = (await listOrders(mom.db, ALL))[0].id;
+  expect(mom.alerts.find((a) => a.kind === 'order')?.localId).toBe(momOrderId);
+  expect(pick(mom)).toEqual([
+    { kind: 'order', action: 'edited', actor: 'Dad', label: 'Order #1' },
+    { kind: 'money', action: 'added', actor: 'Dad', label: 'Expense ₹900 · Oil' },
+  ]);
+  expect(shop.alerts).toEqual([]); // Dad's own changes never alert Dad
+
+  // Mom corrects the expense and marks the order paid by cash: Dad sees her name on both.
+  const [oil] = await listMoneyEntries(mom.db, ALL);
+  await updateMoneyEntry(mom.db, oil.id, { kind: 'expense', amount: 950, method: 'cash', category: 'Oil', note: '' });
+  await setOrderStatus(mom.db, momOrderId, 'cash');
+  mom.engine.schedulePush();
+  await settle(shop, mom);
+  expect(pick(shop)).toEqual([
+    { kind: 'order', action: 'edited', actor: 'Mom', label: 'Order #1' },
+    { kind: 'money', action: 'edited', actor: 'Mom', label: 'Expense ₹950 · Oil' },
+  ]);
+  const dadOrder = (await listOrders(shop.db, ALL))[0];
+  expect([dadOrder.created_by, dadOrder.updated_by]).toEqual(['Dad', 'Mom']);
+
+  // Delete, then undo.
+  await setOrderDeleted(shop.db, id, true);
+  shop.engine.schedulePush();
+  await settle(shop, mom);
+  await setOrderDeleted(shop.db, id, false);
+  shop.engine.schedulePush();
+  await settle(shop, mom);
+  expect(pick(mom).map((a) => a.action)).toEqual(['deleted', 'restored']);
+
+  // Menu changes say who made them.
+  const item = (await listMenu(shop.db))[0];
+  await updateMenuItem(shop.db, item.id, { name: 'Chicken Half', price: 130, color: item.color, active: true });
+  shop.engine.schedulePush();
+  await settle(shop, mom);
+  expect(pick(mom)).toEqual([{ kind: 'menu', action: 'edited', actor: 'Dad', label: 'Menu: Chicken Half' }]);
+
+  // A phone still on v1.3 doesn't send updated_by: the change still applies, with nobody named.
+  const [cloudOrder] = (await cloud.store().getAll('orders')) as RemoteDoc[];
+  const { updated_by: _dropped, ...oldStyle } = cloudOrder;
+  await cloud.store().push('orders', [{ ...oldStyle, status: 'upi', updated_at: Date.now() }]);
+  await settle(shop, mom);
+  expect(pick(mom)).toEqual([{ kind: 'order', action: 'edited', actor: '', label: 'Order #1' }]);
+  expect((await listOrders(mom.db, ALL))[0]).toMatchObject({ status: 'upi', updated_by: '' });
+
+  shop.engine.stop();
+  mom.engine.stop();
 });

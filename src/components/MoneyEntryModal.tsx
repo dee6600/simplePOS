@@ -17,6 +17,7 @@ import { EXPENSE_CATEGORIES } from '../lib/balance';
 import { formatTime } from '../lib/format';
 import type { Method, MoneyEntry, MoneyKind } from '../lib/types';
 import { colors, radius } from '../theme';
+import { Name } from './ByLine';
 import { Segmented } from './Segmented';
 
 export const KIND_META: Record<MoneyKind, { title: string; editTitle: string; color: string; sign: '−' | '+'; notePlaceholder: string }> = {
@@ -75,11 +76,21 @@ function MoneyForm({ target, userName, onClose, onSave, onDelete }: Props & { ta
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
           <Text style={[styles.title, { color: meta.color }]}>{entry ? meta.editTitle : meta.title}</Text>
           <Text style={styles.who}>
-            {entry
-              ? `Added by ${entry.created_by || 'unknown'} at ${formatTime(entry.created_at)}${
-                  entry.updated_by && entry.updated_by !== entry.created_by ? ` · last edited by ${entry.updated_by}` : ''
-                }`
-              : `Saved as: ${userName}`}
+            {entry ? (
+              <>
+                Added by <Name>{entry.created_by || 'unknown'}</Name> at {formatTime(entry.created_at)}
+                {entry.updated_by && entry.updated_by !== entry.created_by ? (
+                  <>
+                    {' · last edited by '}
+                    <Name>{entry.updated_by}</Name>
+                  </>
+                ) : null}
+              </>
+            ) : (
+              <>
+                Saved as: <Name>{userName}</Name>
+              </>
+            )}
           </Text>
 
           <View style={styles.amountRow}>

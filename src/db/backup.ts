@@ -23,8 +23,11 @@ export type Backup = {
 };
 
 const TABLES = {
-  menu_items: ['id', 'uid', 'name', 'price', 'color', 'sort_order', 'active', 'updated_at', 'deleted'],
-  orders: ['id', 'uid', 'order_no', 'created_at', 'updated_at', 'status', 'order_type', 'total', 'deleted', 'created_by'],
+  menu_items: ['id', 'uid', 'name', 'price', 'color', 'sort_order', 'active', 'updated_at', 'deleted', 'updated_by'],
+  orders: [
+    'id', 'uid', 'order_no', 'created_at', 'updated_at', 'status', 'order_type', 'total', 'deleted', 'created_by',
+    'updated_by',
+  ],
   order_items: ['id', 'order_id', 'menu_item_id', 'menu_item_uid', 'name', 'price', 'qty'],
   settings: ['key', 'value'],
   money_entries: [
@@ -126,6 +129,8 @@ export async function restoreBackup(db: SQLiteDatabase, data: Backup): Promise<v
       }
     }
     await backfillUids(db);
+    // Backups from before v1.4 don't say who last changed an order.
+    await db.execAsync("UPDATE orders SET updated_by = created_by WHERE updated_by = '';");
     await db.execAsync('UPDATE orders SET dirty = 1; UPDATE menu_items SET dirty = 1; UPDATE money_entries SET dirty = 1;');
     await setDeviceSetting(db, 'settings_dirty', '1');
   });

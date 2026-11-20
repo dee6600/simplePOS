@@ -35,6 +35,7 @@ export type DeviceSettingKey =
   | 'user_name' // "Dad", "Mom"… shown as "by Dad" on entries
   | 'shop_id' // the shop this phone syncs with, when connected
   | 'my_phone' // this person's number, e.g. 919876543210
+  | 'notify_changes' // '0' = don't show alerts when others make changes (default on)
   | 'settings_dirty'
   | 'settings_updated_at'
   | `cursor_${string}`;

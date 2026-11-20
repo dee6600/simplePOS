@@ -6,6 +6,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { OrderEditor } from '../../components/OrderEditor';
+import { ByLine } from '../../components/ByLine';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useToast } from '../../components/Toast';
 import { listMenu } from '../../db/menu';
@@ -87,6 +88,11 @@ export default function EditOrderScreen() {
           </Pressable>
         }
       />
+      {order.created_by && order.created_by !== 'Imported' ? (
+        <Text style={styles.who} numberOfLines={1}>
+          Added <ByLine createdBy={order.created_by} updatedBy={order.updated_by} />
+        </Text>
+      ) : null}
       <OrderEditor
         menu={data.menu}
         showOrderType={data.settings.showOrderType}
@@ -100,6 +106,7 @@ export default function EditOrderScreen() {
 
 const styles = StyleSheet.create({
   missing: { textAlign: 'center', color: colors.muted, fontSize: 17, marginTop: 40 },
+  who: { fontSize: 15, color: colors.muted, paddingHorizontal: 16, paddingBottom: 6 },
   delete: {
     flexDirection: 'row',
     alignItems: 'center',

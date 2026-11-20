@@ -14,6 +14,7 @@ This is the delivery roadmap. Each milestone produces a working, testable app. C
 | [M5](#m5-real-phone-trial) | Real-phone trial | 🚧 |
 | [M6](#m6-install-on-the-restaurant-phone) | Install on the restaurant phone | ⬜ |
 | [v1.2](#v12-money-who-did-it--family-sync) | Money, who did it & family sync | 🚧 |
+| [v1.4](#v14-who-changed-what-alerts) | "Who changed what" alerts | 🚧 |
 | [Later](#later-post-v1-ideas) | Post-v1 ideas | ⬜ |
 
 ---
@@ -175,6 +176,23 @@ This is the delivery roadmap. Each milestone produces a working, testable app. C
 - [x] Works alongside v1.2 phones (same data format and rules); emulator test covers the version list and the rules
 - [x] Version 1.3.0 (Android versionCode 3, iOS buildNumber 3); installed on Dee's and Shree's iPhones
 - [ ] Install the 1.3.0 APK on the Android phones (last cable/APK install; after that, updates arrive online)
+
+---
+
+## v1.4: "Who changed what" alerts
+
+Ships as an online update (`npm run publish-update`): no native changes, `runtimeVersion` stays "1".
+
+- [x] Database v3 (v2 → v3): `updated_by` on orders and menu items (backfilled from `created_by`); every edit, status change, delete/undo and menu change records who made it; included in backups and sync
+- [x] In-app alert at the top of the screen when another phone's change arrives: "Order #12 changed by **Mom**", "Expense ₹500 · Rice added by **Shree**"; several at once become "5 updates from **Mom** & **Shree**". Sits under the "saved · EDIT" / UNDO message so it never hides it. Tap opens the order (or the Money tab)
+- [x] Settings → This phone: **Alerts when others make changes** switch (on by default)
+- [x] No flood of alerts when a phone first joins the shop (only changes from the last 10 minutes)
+- [x] Works alongside v1.3 phones: their changes still apply, and the alert says "on another phone" instead of a name
+- [x] Names in bold: order cards ("by **Dad** · edited by **Mom**"), Edit Order screen, Money list and entry form
+- [x] Published to the `preview` channel on 2026-11-21 (update group `49ef4200-2aef-46c3-8b2f-59b86eb9eeab`); checked on two simulators against the Firebase emulator
+- [ ] Check on two real phones: edit an order and an expense on one, see the alert on the other
+
+**Not included (needs a new APK/iPhone build):** real phone notifications that arrive while the app is closed (`expo-notifications` + Expo push, FCM key in EAS, Apple push key).
 
 ---
 

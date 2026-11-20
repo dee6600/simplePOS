@@ -3,7 +3,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { newUid } from '../lib/uid';
 import { ITEM_COLORS } from '../theme';
 
-const DATABASE_VERSION = 2;
+const DATABASE_VERSION = 3;
 
 /** Placeholder menu; names and prices are editable in Settings. */
 export const DEFAULT_MENU: { name: string; price: number; color: string }[] = [
@@ -116,7 +116,19 @@ export async function migrateDb(db: SQLiteDatabase): Promise<void> {
     version = 2;
   }
 
-  // Future schema changes go here: if (version === 2) { ...; version = 3; }
+  if (version === 2) {
+    // v1.4: who last changed an order or menu item (money entries already had updated_by).
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(`
+        ALTER TABLE orders ADD COLUMN updated_by TEXT NOT NULL DEFAULT '';
+        UPDATE orders SET updated_by = created_by;
+        ALTER TABLE menu_items ADD COLUMN updated_by TEXT NOT NULL DEFAULT '';
+      `);
+    });
+    version = 3;
+  }
+
+  // Future schema changes go here: if (version === 3) { ...; version = 4; }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
 }

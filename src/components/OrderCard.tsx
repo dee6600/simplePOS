@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { describeLines, formatRupees, formatTime } from '../lib/format';
 import type { Order } from '../lib/types';
 import { colors, radius, STATUS } from '../theme';
+import { ByLine } from './ByLine';
 import { StatusChip } from './StatusChip';
 
 type Props = {
@@ -25,7 +26,7 @@ export function OrderCard({ order, onPress, onMarkPaid }: Props) {
         <Text style={styles.time}>{formatTime(order.created_at)}</Text>
         {order.created_by && order.created_by !== 'Imported' ? (
           <Text style={styles.by} numberOfLines={1}>
-            by {order.created_by}
+            <ByLine createdBy={order.created_by} updatedBy={order.updated_by} />
           </Text>
         ) : null}
         {order.order_type && (
@@ -78,7 +79,7 @@ const styles = StyleSheet.create({
   spacer: { flex: 1 },
   no: { fontSize: 20, fontWeight: '900', color: colors.text },
   time: { fontSize: 15, color: colors.muted },
-  by: { fontSize: 13, color: colors.muted, flexShrink: 1 },
+  by: { fontSize: 15, color: colors.muted, flexShrink: 1 },
   tag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.bg },
   tagText: { fontSize: 13, fontWeight: '700', color: colors.muted },
   items: { fontSize: 16, color: colors.text, lineHeight: 22 },
