@@ -1,4 +1,4 @@
-import { isLatestPeriod, periodLabel, periodRange, shiftPeriod } from '../dates';
+import { customLabel, customRange, isLatestPeriod, periodLabel, periodRange, shiftPeriod } from '../dates';
 
 const d = (y: number, m: number, day: number, h = 12) => new Date(y, m - 1, day, h);
 
@@ -56,5 +56,22 @@ describe('isLatestPeriod / periodLabel', () => {
     expect(periodLabel('week', d(2026, 12, 2), now)).toBe('This week · 30 Nov – 6 Dec');
     expect(periodLabel('week', d(2026, 11, 4), now)).toBe('2 – 8 Nov');
     expect(periodLabel('month', now, now)).toBe('November 2026');
+  });
+});
+
+describe('custom range', () => {
+  const now = d(2026, 11, 23);
+  it('covers whole days from the start of From to the end of To, in either order', () => {
+    const r = customRange(d(2026, 11, 1, 18), d(2026, 11, 23, 9));
+    expect(new Date(r.start)).toEqual(new Date(2026, 10, 1));
+    expect(new Date(r.end)).toEqual(new Date(2026, 10, 24));
+    expect(customRange(d(2026, 11, 23), d(2026, 11, 1))).toEqual(r);
+  });
+
+  it('labels the range briefly', () => {
+    expect(customLabel(d(2026, 11, 1), d(2026, 11, 23), now)).toBe('1 – 23 Nov');
+    expect(customLabel(d(2026, 10, 28), d(2026, 11, 3), now)).toBe('28 Oct – 3 Nov');
+    expect(customLabel(d(2025, 12, 28), d(2026, 1, 3), now)).toBe('28 Dec 2025 – 3 Jan');
+    expect(customLabel(d(2026, 11, 23), d(2026, 11, 23), now)).toBe('Mon, 23 Nov');
   });
 });

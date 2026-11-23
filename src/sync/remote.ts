@@ -1,7 +1,8 @@
 /** What the sync engine needs from the cloud. Firestore implements it; tests use an in-memory fake. */
 
-export type CollectionName = 'menu_items' | 'orders' | 'money' | 'meta';
-export const COLLECTIONS: CollectionName[] = ['menu_items', 'orders', 'money', 'meta'];
+export type CollectionName = 'menu_items' | 'orders' | 'money' | 'meta' | 'stock_items' | 'stock';
+/** stock_items / stock were added in v1.5; older app versions don't know them and leave them alone. */
+export const COLLECTIONS: CollectionName[] = ['menu_items', 'orders', 'money', 'meta', 'stock_items', 'stock'];
 
 /** A synced record. `uid` is the document id; `updated_at` (phone time) decides which edit wins. */
 export type RemoteDoc = { uid: string; updated_at: number; [field: string]: unknown };

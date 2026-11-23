@@ -14,6 +14,7 @@ import { migrateDb } from '../../db/migrate';
 import { addMoneyEntry, listMoneyEntries } from '../../db/money';
 import { createOrder, listOrders, setOrderStatus } from '../../db/orders';
 import { getDeviceSetting, getSettings, saveSetting, setDeviceSetting } from '../../db/settings';
+import { addStockEntry, getStockLevels, listStockEntries, listStockItems } from '../../db/stock';
 import { openTestDb } from '../../test/nodeSqlite';
 import { connectShop } from '../connectShop';
 import { listFamilyPhones, reportThisPhone } from '../devices';
@@ -131,6 +132,14 @@ afterAll(async () => {
   await setOrderStatus(momDb, (await listOrders(momDb, ALL))[0].id, 'upi');
   momEngine.schedulePush();
   await waitFor(async () => (await listOrders(dadDb, ALL))[0].status === 'upi', 'status change → Dad');
+
+  // v1.5 stock: an entry with its expense travels through the real rules; strangers can't read it.
+  const rice = (await listStockItems(momDb)).find((i) => i.uid === 'stock-rice')!;
+  await addStockEntry(momDb, rice, { kind: 'in', qty: 25, note: '', paid: { amount: 1500, method: 'cash' } });
+  momEngine.schedulePush();
+  await waitFor(async () => (await listStockEntries(dadDb, ALL))[0]?.paid_amount === 1500, 'stock → Dad');
+  expect((await getStockLevels(dadDb)).get('stock-rice')).toBe(25);
+  await expect(getDocs(collection(stranger.fs, 'shops', SHOP_ID, 'stock'))).rejects.toMatchObject({ code: 'permission-denied' });
 
   // Each phone reports its app version; family members can list them, strangers can't.
   await reportThisPhone(dad.fs, SHOP_ID, 'dad-phone', 'Dad');

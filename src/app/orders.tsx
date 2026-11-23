@@ -3,16 +3,16 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
-import { OrderCard } from '../../components/OrderCard';
-import { PeriodNav } from '../../components/PeriodNav';
-import { ScreenHeader } from '../../components/ScreenHeader';
-import { useToast } from '../../components/Toast';
-import { listOrders, setOrderStatus } from '../../db/orders';
-import { periodLabel, periodRange, shiftPeriod } from '../../lib/dates';
-import { emitDataChanged, useDataChanged } from '../../lib/events';
-import { formatRupees } from '../../lib/format';
-import type { Order } from '../../lib/types';
-import { colors, STATUS } from '../../theme';
+import { OrderCard } from '../components/OrderCard';
+import { PeriodNav } from '../components/PeriodNav';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { useToast } from '../components/Toast';
+import { listOrders, setOrderStatus } from '../db/orders';
+import { periodLabel, periodRange, shiftPeriod } from '../lib/dates';
+import { emitDataChanged, useDataChanged } from '../lib/events';
+import { formatRupees } from '../lib/format';
+import type { Order } from '../lib/types';
+import { colors, STATUS } from '../theme';
 
 export default function OrdersScreen() {
   const db = useSQLiteContext();
@@ -52,6 +52,7 @@ export default function OrdersScreen() {
     <View style={{ flex: 1 }}>
       <ScreenHeader
         title="Orders"
+        onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
         subtitle={`${stats.count} orders · ${formatRupees(stats.total)}`}
       />
       <View style={styles.controls}>

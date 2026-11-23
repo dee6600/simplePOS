@@ -4,22 +4,27 @@ import * as Sharing from 'expo-sharing';
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { dayKey } from '../lib/dates';
-import { backfillUids } from './migrate';
+import { backfillUids, seedStockItems } from './migrate';
 import { setDeviceSetting } from './settings';
 import { withTx } from './tx';
 
 type Row = Record<string, string | number | null>;
 
-/** Version 1 = app v1.0 (no money entries, no uids). Version 2 = app v1.2. Both can be restored. */
+/**
+ * Version 1 = app v1.0 (no money entries, no uids). Version 2 = app v1.2. Version 3 = app v1.5 (stock).
+ * All can be restored.
+ */
 export type Backup = {
   app: 'simplepos';
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   exported_at: number;
   menu_items: Row[];
   orders: Row[];
   order_items: Row[];
   settings: Row[];
   money_entries?: Row[];
+  stock_items?: Row[];
+  stock_entries?: Row[];
 };
 
 const TABLES = {
@@ -34,6 +39,14 @@ const TABLES = {
     'id', 'uid', 'kind', 'created_at', 'updated_at', 'category', 'amount', 'method', 'note', 'created_by', 'updated_by',
     'deleted',
   ],
+  stock_items: [
+    'id', 'uid', 'name', 'unit', 'grp', 'sort_order', 'active', 'low_level', 'expense_category', 'updated_at', 'updated_by',
+    'deleted',
+  ],
+  stock_entries: [
+    'id', 'uid', 'item_uid', 'kind', 'qty', 'money_uid', 'note', 'created_at', 'updated_at', 'created_by', 'updated_by',
+    'deleted',
+  ],
 } as const;
 
 type Table = keyof typeof TABLES;
@@ -44,13 +57,15 @@ const REQUIRED: Table[] = ['menu_items', 'orders', 'order_items', 'settings'];
 export async function buildBackup(db: SQLiteDatabase): Promise<Backup> {
   const data: Backup = {
     app: 'simplepos',
-    version: 2,
+    version: 3,
     exported_at: Date.now(),
     menu_items: [],
     orders: [],
     order_items: [],
     settings: [],
     money_entries: [],
+    stock_items: [],
+    stock_entries: [],
   };
   for (const t of TABLE_NAMES) {
     data[t] = await db.getAllAsync<Row>(`SELECT ${TABLES[t].join(', ')} FROM ${t}`);
@@ -113,7 +128,7 @@ export async function restoreBackup(db: SQLiteDatabase, data: Backup): Promise<v
     // Children first because of the foreign key.
     await db.execAsync(`
       DELETE FROM order_items; DELETE FROM orders; DELETE FROM menu_items;
-      DELETE FROM settings; DELETE FROM money_entries;
+      DELETE FROM settings; DELETE FROM money_entries; DELETE FROM stock_entries; DELETE FROM stock_items;
     `);
     for (const t of TABLE_NAMES) {
       const cols = TABLES[t];
@@ -129,9 +144,14 @@ export async function restoreBackup(db: SQLiteDatabase, data: Backup): Promise<v
       }
     }
     await backfillUids(db);
+    // Backups from before v1.5 have no stock list: start from the default one.
+    if (!data.stock_items?.length) await seedStockItems(db);
     // Backups from before v1.4 don't say who last changed an order.
     await db.execAsync("UPDATE orders SET updated_by = created_by WHERE updated_by = '';");
-    await db.execAsync('UPDATE orders SET dirty = 1; UPDATE menu_items SET dirty = 1; UPDATE money_entries SET dirty = 1;');
+    await db.execAsync(`
+      UPDATE orders SET dirty = 1; UPDATE menu_items SET dirty = 1; UPDATE money_entries SET dirty = 1;
+      UPDATE stock_entries SET dirty = 1; UPDATE stock_items SET dirty = CASE WHEN updated_at > 0 THEN 1 ELSE 0 END;
+    `);
     await setDeviceSetting(db, 'settings_dirty', '1');
   });
 }

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
 /** Something another family phone added, changed or deleted, as seen when it arrives through sync. */
-export type ChangeKind = 'order' | 'money' | 'menu' | 'settings';
+export type ChangeKind = 'order' | 'money' | 'menu' | 'settings' | 'stock';
 export type ChangeAction = 'added' | 'edited' | 'deleted' | 'restored';
 
 export type RemoteChange = {

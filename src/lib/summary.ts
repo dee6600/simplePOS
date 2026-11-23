@@ -23,6 +23,12 @@ export type Summary = {
   expenses: number;
   expenseCount: number;
   expensesByCategory: CategoryTotal[];
+  /** Expenses paid from the cash box / from the bank (UPI). */
+  cashExpenses: number;
+  bankExpenses: number;
+  /** Cash sales − cash expenses, and UPI sales − bank expenses: what each brought in after paying for things. */
+  cashAfterExpenses: number;
+  upiAfterExpenses: number;
   /** Sales + money added − expenses. Money taken out is not counted (it is a withdrawal, not a cost). */
   profit: number;
   /** Lump sums added to / taken out of the balance. Money added counts as profit. */
@@ -43,6 +49,7 @@ export function summarize(orders: Order[], menuOrder: number[] = [], entries: Mo
     cash: 0, cashCount: 0, upi: 0, upiCount: 0,
     itemCount: 0, items: [], dineIn: 0, parcel: 0, untagged: 0,
     expenses: 0, expenseCount: 0, expensesByCategory: [], profit: 0, moneyIn: 0, moneyOut: 0,
+    cashExpenses: 0, bankExpenses: 0, cashAfterExpenses: 0, upiAfterExpenses: 0,
     days: [],
   };
   const items = new Map<string, ItemTotal & { seenAt: number; menuId: number | null }>();
@@ -96,6 +103,8 @@ export function summarize(orders: Order[], menuOrder: number[] = [], entries: Mo
     else {
       s.expenses += e.amount;
       s.expenseCount += 1;
+      if (e.method === 'cash') s.cashExpenses += e.amount;
+      else s.bankExpenses += e.amount;
       const name = e.category || 'Other';
       const c = categories.get(name) ?? { category: name, amount: 0, count: 0 };
       c.amount += e.amount;
@@ -106,6 +115,8 @@ export function summarize(orders: Order[], menuOrder: number[] = [], entries: Mo
   }
   s.expensesByCategory = [...categories.values()].sort((a, b) => b.amount - a.amount);
   s.profit = s.total + s.moneyIn - s.expenses;
+  s.cashAfterExpenses = s.cash - s.cashExpenses;
+  s.upiAfterExpenses = s.upi - s.bankExpenses;
 
   const rank = (menuId: number | null) => {
     const i = menuId == null ? -1 : menuOrder.indexOf(menuId);
@@ -121,7 +132,15 @@ export function summarize(orders: Order[], menuOrder: number[] = [], entries: Mo
 /** Plain-text version for sharing on WhatsApp/SMS. */
 export function summaryText(
   s: Summary,
-  opts: { restaurantName: string; periodLabel: string; showOrderType: boolean; showDays: boolean; balance?: Balance },
+  opts: {
+    restaurantName: string;
+    periodLabel: string;
+    showOrderType: boolean;
+    showDays: boolean;
+    balance?: Balance;
+    /** "Rice: bought 50 kg · sent 45 kg", from the Stock tab. */
+    kitchen?: string[];
+  },
 ): string {
   const out = [
     `*${opts.restaurantName}*`,
@@ -147,6 +166,12 @@ export function summaryText(
     out.push('', `Money added: ${formatRupees(s.moneyIn)} · Taken out: ${formatRupees(s.moneyOut)}`);
   }
   out.push('', `*Profit (sales + money added − expenses): ${formatRupees(s.profit)}*`);
+  if (s.expenseCount) {
+    out.push(`Cash after expenses: ${formatRupees(s.cashAfterExpenses)}`, `UPI after expenses: ${formatRupees(s.upiAfterExpenses)}`);
+  }
+  if (opts.kitchen?.length) {
+    out.push('', 'Kitchen:', ...opts.kitchen);
+  }
   if (opts.balance) {
     const b = opts.balance;
     out.push('', `Balance now: Cash ${formatRupees(b.cash)} · Bank ${formatRupees(b.bank)} · Total ${formatRupees(b.total)}`);

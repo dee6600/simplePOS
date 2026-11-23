@@ -85,6 +85,27 @@ describe('summarize', () => {
     expect(text).not.toMatch(/pending/i);
   });
 
+  it('shows cash and UPI left after the expenses paid each way', () => {
+    const expense = (amount: number, method: MoneyEntry['method']): MoneyEntry => ({
+      id: nextId, uid: `m${nextId++}`, kind: 'expense', amount, method, category: 'Rice',
+      note: '', created_at: new Date(2026, 10, 18, 9).getTime(), updated_at: 0, deleted: 0,
+      created_by: 'Dad', updated_by: 'Dad',
+    });
+    const s = summarize(
+      [order({ status: 'cash', items: [chickenFull(5)] }), order({ status: 'upi', items: [chickenFull(3)] })], // 1000 cash, 600 UPI
+      [],
+      [expense(300, 'cash'), expense(150, 'cash'), expense(800, 'bank'), { ...expense(50, 'cash'), deleted: 1 }],
+    );
+    expect([s.cashExpenses, s.bankExpenses]).toEqual([450, 800]);
+    expect([s.cashAfterExpenses, s.upiAfterExpenses]).toEqual([550, -200]);
+    const text = summaryText(s, {
+      restaurantName: 'Shop', periodLabel: 'Today', showOrderType: false, showDays: false, kitchen: ['Rice: bought 25 kg'],
+    });
+    expect(text).toContain('Cash after expenses: ₹550');
+    expect(text).toContain('UPI after expenses: -₹200');
+    expect(text).toContain('Kitchen:\nRice: bought 25 kg');
+  });
+
   it('handles no orders', () => {
     const s = summarize([]);
     expect(s.total).toBe(0);

@@ -1,11 +1,12 @@
 # SimplePOS
 
-A small, fast point-of-sale app for a biryani restaurant, for Android and iPhone (Expo / React Native). Version 1.3.
+A small, fast point-of-sale app for a biryani restaurant, for Android and iPhone (Expo / React Native). Version 1.5.
 
 - **New Order**: tap item tiles to add (tap **−** to remove), then tap **Paid Cash** or **Paid UPI** to save. (v1.3 removed Pending: every order is paid when it's saved.)
 - **Orders**: the day's orders, each showing who made it. Tap an order to edit or delete it (with Undo). Use ◀ ▶ to see earlier days.
 - **Money**: the running balance (**Cash in hand**, **Bank**, **Total**). Record **Expenses** (Rice, Chicken, Oil, Gas, Salary, …), **Add money** (e.g. the opening balance) and **Take out**, each as Cash or Bank/UPI. Tap an entry to edit or delete it (with Undo).
-- **Summary**: Day / Week / Month sales, cash vs UPI, plates sold per item, expenses by category, profit (sales + money added − expenses; money taken out doesn't reduce profit), lump sums and the balance now. Tap **Share** to send it on WhatsApp.
+- **Stock**: the day's kitchen record. Biryani cards (Hyderabadi, Tandoor): **Cooked** and **Left** in kg, **Staff** portions in grams, and Sold ≈ cooked − left − staff next to the plates sold. **Kept at home** (rice, barista, oil): **Bought** from the vendor or **Sent to shop**, with the stock left now and a low-stock warning. **Bought today** (chicken, vegetables). A purchase can also save its expense in Money. **Edit stock items** adds or renames items.
+- **Summary**: Day / Week / Month or any **Dates** range (From / To) of sales, cash vs UPI, **cash in hand and UPI after expenses**, plates sold per item, expenses by category, the kitchen totals, profit (sales + money added − expenses; money taken out doesn't reduce profit), lump sums and the balance now. Tap **Share** to send it on WhatsApp.
 - **Settings**: this phone's user name and phone number, family sync (status, Sync now, Sign out, which app version each phone is on), **Check for app update**, menu names, prices, colours and order, the optional Dine-in / Parcel tag, and backup export / restore.
 
 Each phone shows a one-time **Welcome** screen: the person's own phone number (when family sync is set up) and who they are (Mom, Dad, Shree, Dee, or a typed name). Orders record who made them; expenses and lump sums record who added them and who last edited them.
@@ -96,10 +97,10 @@ What can and can't go out online:
 ## Code layout
 
 ```
-src/app/            screens (Expo Router): (tabs)/index, orders, money, summary, settings; order/[id] edits an order
+src/app/            screens (Expo Router): (tabs)/index, orders, money, stock, summary, settings; order/[id] edits an order; stock-items edits the stock list
 src/components/     OrderEditor, MoneyEntryModal, FamilySyncSection, LoginGate, SyncBadge, OrderCard, Toast, …
 src/db/             SQLite schema/migrations, orders, menu, money, settings, backup
-src/lib/            pure logic: dates, summary maths, balance, formatting
+src/lib/            pure logic: dates, summary maths, stock maths, balance, formatting
 src/sync/           family sync: phone-number login (shopLogin, connectShop), engine (upload queue + live download), mapping, Firestore adapter, config (reads .env.local)
 firestore.rules     cloud security rules: only numbers in the members list (paste into the Firebase console)
 .env.example        template for the private .env.local (Firebase settings; never committed)

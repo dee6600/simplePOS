@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
-import { formatDayShort } from '../lib/dates';
+import { formatDayMonth } from '../lib/dates';
 import { formatTime } from '../lib/format';
 import type { DeviceInfo } from '../sync/devices';
 import type { ConnectMode } from '../sync/connectShop';
@@ -149,13 +149,11 @@ export function FamilySyncSection() {
                   <Text style={[styles.bigBtnText, { color: colors.text }]}>Sign out</Text>
                 </Pressable>
               </View>
-              <Pressable onPress={showPhones} disabled={loadingPhones} style={[styles.bigBtn, styles.outline, { flex: 0 }]}>
+              <Pressable onPress={showPhones} disabled={loadingPhones} style={styles.link} hitSlop={6}>
                 {loadingPhones ? (
                   <ActivityIndicator color={colors.primary} />
                 ) : (
-                  <Text style={[styles.bigBtnText, { color: colors.primary }]}>
-                    {phones ? 'Refresh app versions' : 'Which app version is each phone on?'}
-                  </Text>
+                  <Text style={styles.linkText}>{phones ? 'Refresh app versions' : 'App version on each phone'}</Text>
                 )}
               </Pressable>
               {phones && <PhoneVersions phones={phones} />}
@@ -188,35 +186,27 @@ function versionKey(p: DeviceInfo): string {
   return `${v}|${String(p.update_created_at ?? 0).padStart(15, '0')}`;
 }
 
+/** One short line per phone: "Mom · Android · v1.5.0 (22 Nov)   ✓". */
 function PhoneVersions({ phones }: { phones: DeviceInfo[] }) {
   const latest = phones.reduce((max, p) => (versionKey(p) > max ? versionKey(p) : max), '');
-  const when = (ms: number) => `${formatDayShort(new Date(ms))} ${formatTime(ms)}`;
   return (
-    <View style={{ gap: 8 }}>
+    <View>
       {phones.map((p) => {
         const upToDate = versionKey(p) === latest;
+        const platform = p.platform === 'ios' ? 'iPhone' : p.platform === 'android' ? 'Android' : p.platform;
+        const updated = p.update_created_at ? ` (${formatDayMonth(new Date(p.update_created_at))})` : '';
         return (
           <View key={p.device_id} style={styles.phoneRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.phoneName}>
-                {p.user_name || 'No name'} · {p.platform === 'ios' ? 'iPhone' : p.platform === 'android' ? 'Android' : p.platform}
-              </Text>
-              <Text style={styles.hint}>
-                v{p.app_version}
-                {p.update_created_at ? ` · update of ${when(p.update_created_at)}` : ' · as installed'}
-                {p.seen_at ? ` · seen ${when(p.seen_at)}` : ''}
-              </Text>
-            </View>
+            <Text style={styles.phoneText} numberOfLines={1}>
+              <Text style={styles.phoneName}>{p.user_name || 'No name'}</Text> · {platform} · v{p.app_version}
+              {updated}
+            </Text>
             <Text style={[styles.phoneTag, { color: upToDate ? '#15803D' : colors.danger }]}>
-              {upToDate ? 'Latest' : 'Needs update'}
+              {upToDate ? '✓' : 'Update'}
             </Text>
           </View>
         );
       })}
-      <Text style={styles.hint}>
-        A phone shows here once it opens v1.3 or newer. Phones still on v1.2 keep working and syncing, but need the new
-        APK / iPhone build installed once before they can update online.
-      </Text>
     </View>
   );
 }
@@ -240,7 +230,10 @@ const styles = StyleSheet.create({
   outline: { backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border },
   bigBtn: { flex: 1, height: 52, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
   bigBtnText: { color: colors.white, fontSize: 16, fontWeight: '800' },
-  phoneRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4, borderTopWidth: 1, borderTopColor: colors.border },
-  phoneName: { fontSize: 16, fontWeight: '800', color: colors.text },
+  phoneRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  phoneText: { flex: 1, fontSize: 14, color: colors.muted },
+  phoneName: { fontWeight: '800', color: colors.text },
   phoneTag: { fontSize: 14, fontWeight: '800' },
+  link: { alignSelf: 'center', paddingVertical: 4, minHeight: 32, justifyContent: 'center' },
+  linkText: { color: colors.primary, fontSize: 14, fontWeight: '800' },
 });

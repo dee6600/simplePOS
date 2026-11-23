@@ -1,6 +1,6 @@
 {
   "name": "simplepos",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
@@ -42,7 +42,7 @@
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
-    "test:emulator": "npx firebase-tools@latest emulators:exec --only auth,firestore --project demo-simplepos \"jest --config jest.emulator.config.js\"",
+    "test:emulator": "PATH=/opt/homebrew/opt/openjdk@21/bin:$PATH npx -y firebase-tools@latest emulators:exec --only auth,firestore --project demo-simplepos \"jest --config jest.emulator.config.js\"",
     "import-backup": "jest --config jest.emulator.config.js --testMatch \"<rootDir>/scripts/*.run.ts\" --verbose=false",
     "publish-update": "bash scripts/publish-update.sh"
   },

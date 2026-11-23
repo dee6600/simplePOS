@@ -3,7 +3,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { newUid } from '../lib/uid';
 import { ITEM_COLORS } from '../theme';
 
-const DATABASE_VERSION = 3;
+const DATABASE_VERSION = 4;
 
 /** Placeholder menu; names and prices are editable in Settings. */
 export const DEFAULT_MENU: { name: string; price: number; color: string }[] = [
@@ -128,9 +128,87 @@ export async function migrateDb(db: SQLiteDatabase): Promise<void> {
     version = 3;
   }
 
-  // Future schema changes go here: if (version === 3) { ...; version = 4; }
+  if (version === 3) {
+    // v1.5: kitchen stock (rice, oil, chicken…) and the daily biryani weights.
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(STOCK_SCHEMA);
+      await seedStockItems(db);
+    });
+    version = 4;
+  }
+
+  // Future schema changes go here: if (version === 4) { ...; version = 5; }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
+}
+
+/**
+ * No CHECK constraints on kind / grp: a newer app version may sync a value this one doesn't know yet,
+ * and a failed insert would stop sync. Unknown values are ignored on screen instead.
+ */
+const STOCK_SCHEMA = `
+  CREATE TABLE IF NOT EXISTS stock_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    uid TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    unit TEXT NOT NULL,
+    grp TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    active INTEGER NOT NULL DEFAULT 1,
+    low_level REAL,
+    expense_category TEXT,
+    updated_at INTEGER NOT NULL DEFAULT 0,
+    updated_by TEXT NOT NULL DEFAULT '',
+    deleted INTEGER NOT NULL DEFAULT 0,
+    dirty INTEGER NOT NULL DEFAULT 1
+  );
+  CREATE TABLE IF NOT EXISTS stock_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    uid TEXT NOT NULL UNIQUE,
+    item_uid TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    qty REAL NOT NULL,
+    money_uid TEXT,
+    note TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    created_by TEXT NOT NULL DEFAULT '',
+    updated_by TEXT NOT NULL DEFAULT '',
+    deleted INTEGER NOT NULL DEFAULT 0,
+    dirty INTEGER NOT NULL DEFAULT 1
+  );
+  CREATE INDEX IF NOT EXISTS idx_stock_created ON stock_entries (created_at);
+  CREATE INDEX IF NOT EXISTS idx_stock_item ON stock_entries (item_uid);
+`;
+
+/**
+ * Starting stock list, editable on the Stock tab. Fixed uids and updated_at = 0 make every family phone's
+ * copy the same cloud record: they aren't uploaded (dirty = 0), and any real edit from a phone wins.
+ */
+export const DEFAULT_STOCK: { uid: string; name: string; unit: string; grp: 'cooked' | 'home' | 'daily'; category: string | null; low?: number }[] = [
+  { uid: 'stock-hyderabadi', name: 'Hyderabadi Chicken Biryani', unit: 'kg', grp: 'cooked', category: null },
+  { uid: 'stock-tandoor', name: 'Tandoor Chicken Biryani', unit: 'kg', grp: 'cooked', category: null },
+  { uid: 'stock-rice', name: 'Rice', unit: 'kg', grp: 'home', category: 'Rice', low: 10 },
+  { uid: 'stock-barista', name: 'Barista', unit: 'kg', grp: 'home', category: 'Vegetables & Masala', low: 1 },
+  { uid: 'stock-oil', name: 'Oil', unit: 'L', grp: 'home', category: 'Oil', low: 3 },
+  { uid: 'stock-chicken', name: 'Chicken', unit: 'kg', grp: 'daily', category: 'Chicken' },
+  { uid: 'stock-onion', name: 'Onion', unit: 'kg', grp: 'daily', category: 'Vegetables & Masala' },
+  { uid: 'stock-coriander', name: 'Coriander', unit: 'bunch', grp: 'daily', category: 'Vegetables & Masala' },
+  { uid: 'stock-pudina', name: 'Pudina', unit: 'bunch', grp: 'daily', category: 'Vegetables & Masala' },
+  { uid: 'stock-ginger', name: 'Ginger', unit: 'kg', grp: 'daily', category: 'Vegetables & Masala' },
+  { uid: 'stock-garlic', name: 'Garlic', unit: 'kg', grp: 'daily', category: 'Vegetables & Masala' },
+  { uid: 'stock-salt', name: 'Salt', unit: 'kg', grp: 'daily', category: 'Vegetables & Masala' },
+];
+
+/** Adds the starting stock list (skipping any already there). Call inside a transaction. */
+export async function seedStockItems(db: SQLiteDatabase): Promise<void> {
+  for (const [i, s] of DEFAULT_STOCK.entries()) {
+    await db.runAsync(
+      `INSERT OR IGNORE INTO stock_items (uid, name, unit, grp, sort_order, active, low_level, expense_category, updated_at, dirty)
+       VALUES (?, ?, ?, ?, ?, 1, ?, ?, 0, 0)`,
+      s.uid, s.name, s.unit, s.grp, i, s.low ?? null, s.category,
+    );
+  }
 }
 
 /** Gives every synced row a uid (used after migration and after restoring an old backup). */

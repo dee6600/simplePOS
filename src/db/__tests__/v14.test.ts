@@ -31,7 +31,7 @@ test('upgrading a v1.3 phone fills in who last changed each order', async () => 
   `);
 
   await migrateDb(db);
-  expect((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version).toBe(3);
+  expect((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version).toBe(4);
   const [order] = await listOrders(db, ALL);
   expect([order.created_by, order.updated_by]).toEqual(['Dad', 'Dad']);
   const dirty = await db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM orders WHERE dirty = 1');

@@ -104,6 +104,7 @@ function ChangeBanner() {
   const only = changes.length === 1 ? changes[0] : null;
   const opensOrder = only?.kind === 'order' && only.action !== 'deleted' && only.localId != null;
   const opensMoney = changes.every((c) => c.kind === 'money');
+  const opensStock = !opensMoney && changes.every((c) => c.kind === 'stock' || c.kind === 'money');
 
   const open = () => {
     setChanges([]);
@@ -111,6 +112,8 @@ function ChangeBanner() {
       router.push({ pathname: '/order/[id]', params: { id: String(only.localId) } });
     } else if (opensMoney) {
       router.navigate('/money');
+    } else if (opensStock) {
+      router.navigate('/stock');
     }
   };
 
@@ -120,7 +123,9 @@ function ChangeBanner() {
       style={({ pressed }) => [styles.banner, pressed && { opacity: 0.85 }]}
       accessibilityRole="button"
       accessibilityLabel={changeTextString(text)}
-      accessibilityHint={opensOrder ? 'Opens the order' : opensMoney ? 'Opens the Money tab' : 'Hides this alert'}
+      accessibilityHint={
+        opensOrder ? 'Opens the order' : opensMoney ? 'Opens the Money tab' : opensStock ? 'Opens the Stock tab' : 'Hides this alert'
+      }
     >
       <View style={styles.bannerBody}>
         <Text style={styles.bannerText} numberOfLines={2}>

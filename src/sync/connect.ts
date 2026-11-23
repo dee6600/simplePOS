@@ -12,7 +12,10 @@ async function resetCursors(db: SQLiteDatabase) {
 /** First phone: everything on this phone will be uploaded to the new shop. */
 export async function prepareCreate(db: SQLiteDatabase, shopId: string, myPhone: string): Promise<void> {
   await withTx(db, async () => {
-    await db.execAsync('UPDATE orders SET dirty = 1; UPDATE menu_items SET dirty = 1; UPDATE money_entries SET dirty = 1;');
+    await db.execAsync(`
+      UPDATE orders SET dirty = 1; UPDATE menu_items SET dirty = 1; UPDATE money_entries SET dirty = 1;
+      UPDATE stock_entries SET dirty = 1; UPDATE stock_items SET dirty = 1 WHERE updated_at > 0;
+    `);
     if (!Number((await getDeviceSetting(db, 'settings_updated_at')) ?? 0)) {
       await setDeviceSetting(db, 'settings_updated_at', String(Date.now()));
     }
@@ -27,16 +30,18 @@ export async function prepareCreate(db: SQLiteDatabase, shopId: string, myPhone:
  * Another phone joins: the menu and shop settings always come from the shop.
  * keepLocal=false (normal): this phone's orders and money entries are removed and the shop's are downloaded.
  * keepLocal=true: this phone's orders and money entries are uploaded into the shop as well.
+ * Stock entries go the same way as money entries. Stock items stay: the starting list has the same ids on
+ * every phone, and the shop's edits to it are downloaded on top.
  */
 export async function prepareJoin(
   db: SQLiteDatabase, shopId: string, myPhone: string, keepLocal: boolean,
 ): Promise<void> {
   await withTx(db, async () => {
     if (keepLocal) {
-      await db.execAsync('UPDATE orders SET dirty = 1; UPDATE money_entries SET dirty = 1;');
+      await db.execAsync('UPDATE orders SET dirty = 1; UPDATE money_entries SET dirty = 1; UPDATE stock_entries SET dirty = 1;');
       await db.execAsync('UPDATE order_items SET menu_item_id = NULL, menu_item_uid = NULL;');
     } else {
-      await db.execAsync('DELETE FROM order_items; DELETE FROM orders; DELETE FROM money_entries;');
+      await db.execAsync('DELETE FROM order_items; DELETE FROM orders; DELETE FROM money_entries; DELETE FROM stock_entries;');
     }
     await db.execAsync('DELETE FROM menu_items;');
     await setDeviceSetting(db, 'settings_dirty', '0');

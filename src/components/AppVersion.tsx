@@ -3,9 +3,8 @@ import * as Updates from 'expo-updates';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { formatDayShort } from '../lib/dates';
-import { formatTime } from '../lib/format';
-import { colors, radius } from '../theme';
+import { formatDayMonth } from '../lib/dates';
+import { colors } from '../theme';
 
 /**
  * App version, plus a button that downloads an online update (EAS Update) and restarts into it.
@@ -37,34 +36,22 @@ export function AppVersion() {
     <View style={styles.wrap}>
       <Text style={styles.version}>
         SimplePOS v{version}
-        {updatedAt ? ` · updated ${formatDayShort(updatedAt)} ${formatTime(updatedAt.getTime())}` : ''}
+        {updatedAt ? ` · ${formatDayMonth(updatedAt)}` : ''}
       </Text>
-      {Updates.isEnabled && (
-        <Pressable onPress={check} disabled={busy} style={styles.btn} accessibilityRole="button">
-          {busy ? (
-            <ActivityIndicator color={colors.primary} />
-          ) : (
-            <Text style={styles.btnText}>Check for app update</Text>
-          )}
-        </Pressable>
-      )}
+      {Updates.isEnabled &&
+        (busy ? (
+          <ActivityIndicator color={colors.primary} size="small" />
+        ) : (
+          <Pressable onPress={check} hitSlop={10} accessibilityRole="button">
+            <Text style={styles.link}>· Check for update</Text>
+          </Pressable>
+        ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { alignItems: 'center', gap: 8 },
-  version: { textAlign: 'center', color: colors.muted, fontSize: 13 },
-  btn: {
-    paddingHorizontal: 18,
-    height: 44,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-    justifyContent: 'center',
-    minWidth: 200,
-    alignItems: 'center',
-  },
-  btnText: { color: colors.primary, fontSize: 15, fontWeight: '800' },
+  wrap: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 32 },
+  version: { color: colors.muted, fontSize: 13 },
+  link: { color: colors.primary, fontSize: 13, fontWeight: '800' },
 });

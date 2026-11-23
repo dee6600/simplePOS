@@ -75,7 +75,7 @@ async function expectRealData(db: SQLiteDatabase) {
     }
 
     await migrateDb(db);
-    expect(await db.getFirstAsync('PRAGMA user_version')).toEqual({ user_version: 3 });
+    expect(await db.getFirstAsync('PRAGMA user_version')).toEqual({ user_version: 4 });
     await expectRealData(db);
     await migrateDb(db); // idempotent
     await expectRealData(db);

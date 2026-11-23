@@ -93,3 +93,32 @@ export function periodLabel(period: Period, anchor: Date, now: Date = new Date()
     }
   }
 }
+
+/** From the start of `from`'s day to the end of `to`'s day (the two are swapped if given backwards). */
+export function customRange(from: Date, to: Date): Range {
+  const [a, b] = from.getTime() <= to.getTime() ? [from, to] : [to, from];
+  return {
+    start: periodStart('day', a).getTime(),
+    end: shiftPeriod('day', b, 1).getTime(),
+  };
+}
+
+/** "1 – 23 Nov", "28 Oct – 3 Nov", "Mon, 23 Nov" for one day; the year is added when it isn't this year. */
+export function customLabel(from: Date, to: Date, now: Date = new Date()): string {
+  const [a, b] = from.getTime() <= to.getTime() ? [from, to] : [to, from];
+  const yearSuffix = (d: Date) => (d.getFullYear() !== now.getFullYear() ? ` ${d.getFullYear()}` : '');
+  if (sameDay(a, b)) return formatDayShort(a) + yearSuffix(a);
+  const sameYear = a.getFullYear() === b.getFullYear();
+  const left =
+    a.getMonth() === b.getMonth() && sameYear
+      ? `${a.getDate()}`
+      : `${a.getDate()} ${MONTHS[a.getMonth()]}${sameYear ? '' : ` ${a.getFullYear()}`}`;
+  return `${left} – ${b.getDate()} ${MONTHS[b.getMonth()]}${yearSuffix(b)}`;
+}
+
+/** "1 Nov" (with the year when it isn't this year). */
+export function formatDayMonth(d: Date, now: Date = new Date()): string {
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}${d.getFullYear() !== now.getFullYear() ? ` ${d.getFullYear()}` : ''}`;
+}
+
+export const MONTH_NAMES = MONTHS_FULL;

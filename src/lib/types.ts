@@ -63,3 +63,48 @@ export type Settings = {
   showOrderType: boolean;
   restaurantName: string;
 };
+
+/**
+ * cooked = weighed after cooking (biryani); home = bought in bulk and kept at home, sent to the shop as needed;
+ * daily = bought fresh each day (chicken, vegetables).
+ */
+export type StockGroup = 'cooked' | 'home' | 'daily';
+/**
+ * in = cooked (cooked items) or bought (others); out = sent from home to the shop;
+ * left = left over at closing (cooked); staff = one staff/worker portion (cooked).
+ */
+export type StockKind = 'in' | 'out' | 'left' | 'staff';
+
+export type StockItem = {
+  id: number;
+  uid: string;
+  name: string;
+  /** kg, L, bunch, pcs, packet. Quantities are stored in this unit (staff portions in kg, shown in grams). */
+  unit: string;
+  grp: StockGroup;
+  sort_order: number;
+  active: number;
+  /** At-home items: warn when the stock falls to this level. */
+  low_level: number | null;
+  /** Expense category used when a purchase also records what was paid. */
+  expense_category: string | null;
+};
+
+export type StockEntry = {
+  id: number;
+  uid: string;
+  item_uid: string;
+  kind: StockKind;
+  qty: number;
+  /** The expense saved with this purchase, if any. */
+  money_uid: string | null;
+  note: string;
+  created_at: number;
+  updated_at: number;
+  created_by: string;
+  updated_by: string;
+  deleted: number;
+  /** From the linked expense (when it still exists). */
+  paid_amount: number | null;
+  paid_method: Method | null;
+};

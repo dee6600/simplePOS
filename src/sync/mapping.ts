@@ -8,12 +8,16 @@ import { getDeviceSetting, getSettings, setDeviceSetting } from '../db/settings'
 import { withTx } from '../db/tx';
 import type { ChangeKind, RemoteChange } from '../lib/changes';
 import { formatRupees } from '../lib/format';
+import { formatGrams, formatQty, kindLabel } from '../lib/stock';
+import type { StockGroup, StockKind } from '../lib/types';
 import type { CollectionName, IncomingDoc, RemoteDoc } from './remote';
 
 const TABLE: Record<Exclude<CollectionName, 'meta'>, string> = {
   menu_items: 'menu_items',
   orders: 'orders',
   money: 'money_entries',
+  stock_items: 'stock_items',
+  stock: 'stock_entries',
 };
 
 const FIELDS = {
@@ -23,6 +27,12 @@ const FIELDS = {
   ],
   money: [
     'uid', 'kind', 'created_at', 'updated_at', 'category', 'amount', 'method', 'note', 'created_by', 'updated_by', 'deleted',
+  ],
+  stock_items: [
+    'uid', 'name', 'unit', 'grp', 'sort_order', 'active', 'low_level', 'expense_category', 'deleted', 'updated_at', 'updated_by',
+  ],
+  stock: [
+    'uid', 'item_uid', 'kind', 'qty', 'money_uid', 'note', 'created_at', 'updated_at', 'created_by', 'updated_by', 'deleted',
   ],
 } as const;
 
@@ -74,21 +84,38 @@ export async function countDirty(db: SQLiteDatabase): Promise<number> {
   const row = await db.getFirstAsync<{ n: number }>(`
     SELECT (SELECT COUNT(*) FROM orders WHERE dirty = 1)
          + (SELECT COUNT(*) FROM menu_items WHERE dirty = 1)
-         + (SELECT COUNT(*) FROM money_entries WHERE dirty = 1) AS n
+         + (SELECT COUNT(*) FROM money_entries WHERE dirty = 1)
+         + (SELECT COUNT(*) FROM stock_items WHERE dirty = 1)
+         + (SELECT COUNT(*) FROM stock_entries WHERE dirty = 1) AS n
   `);
   const settings = (await getDeviceSetting(db, 'settings_dirty')) === '1' ? 1 : 0;
   return (row?.n ?? 0) + settings;
 }
 
 const val = (v: unknown) => (v === undefined ? null : (v as string | number | null));
-/** Phones on v1.3 and older don't send updated_by; the column can't be NULL. */
-const fieldVal = (d: Row, f: string) => (f.endsWith('_by') ? String(d[f] ?? '') : val(d[f]));
+/** Phones on v1.3 and older don't send updated_by; text columns can't be NULL. */
+const fieldVal = (d: Row, f: string) => (f.endsWith('_by') || f === 'note' ? String(d[f] ?? '') : val(d[f]));
 
-const KIND: Record<Exclude<CollectionName, 'meta'>, ChangeKind> = { menu_items: 'menu', orders: 'order', money: 'money' };
+const KIND: Record<Exclude<CollectionName, 'meta'>, ChangeKind> = {
+  menu_items: 'menu', orders: 'order', money: 'money', stock_items: 'stock', stock: 'stock',
+};
+
+/** "Stock: Rice +25 kg bought", "Stock: Hyderabadi Chicken Biryani · Staff 250 g". */
+async function stockLabel(db: SQLiteDatabase, d: Row): Promise<string> {
+  const item = await db.getFirstAsync<{ name: string; unit: string; grp: StockGroup }>(
+    'SELECT name, unit, grp FROM stock_items WHERE uid = ?', String(d.item_uid ?? ''),
+  );
+  if (!item) return 'Stock entry';
+  const kind = d.kind as StockKind;
+  const qty = Number(d.qty ?? 0);
+  const amount = kind === 'staff' ? formatGrams(qty) : formatQty(qty, item.unit);
+  return `Stock: ${item.name} · ${kindLabel(item.grp, kind)} ${amount}`;
+}
 
 function changeLabel(c: CollectionName, d: Row): string {
   if (c === 'orders') return `Order #${d.order_no}`;
   if (c === 'menu_items') return `Menu: ${d.name}`;
+  if (c === 'stock_items') return `Stock item: ${d.name}`;
   const amount = formatRupees(Number(d.amount ?? 0));
   if (d.kind === 'expense') return d.category ? `Expense ${amount} · ${d.category}` : `Expense ${amount}`;
   return d.kind === 'in' ? `Add money ${amount}` : `Take out ${amount}`;
@@ -170,10 +197,9 @@ export async function applyIncoming(
       applied += 1;
       const action = changeAction(Boolean(local?.deleted), Boolean(d.deleted), !local);
       if (action) {
-        const actor = action === 'added' && c !== 'menu_items' ? d.created_by : d.updated_by;
-        changes.push({
-          kind: KIND[c], action, localId: id, actor: String(actor ?? ''), label: changeLabel(c, d), at: d.updated_at,
-        });
+        const actor = action === 'added' && c !== 'menu_items' && c !== 'stock_items' ? d.created_by : d.updated_by;
+        const label = c === 'stock' ? await stockLabel(db, d) : changeLabel(c, d);
+        changes.push({ kind: KIND[c], action, localId: id, actor: String(actor ?? ''), label, at: d.updated_at });
       }
     }
 

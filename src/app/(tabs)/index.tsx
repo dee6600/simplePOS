@@ -1,7 +1,8 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { OrderEditor } from '../../components/OrderEditor';
 import { ScreenHeader } from '../../components/ScreenHeader';
@@ -13,7 +14,7 @@ import { periodRange } from '../../lib/dates';
 import { emitDataChanged, useDataChanged } from '../../lib/events';
 import { formatRupees, linesTotal } from '../../lib/format';
 import type { MenuItem, Settings } from '../../lib/types';
-import { STATUS } from '../../theme';
+import { colors, radius, STATUS } from '../../theme';
 
 export default function NewOrderScreen() {
   const db = useSQLiteContext();
@@ -64,7 +65,20 @@ export default function NewOrderScreen() {
     <View style={{ flex: 1 }}>
       <ScreenHeader
         title="New Order"
+        subtitleLines={2}
         subtitle={`${settings.restaurantName} · Today: ${today.count} order${today.count === 1 ? '' : 's'} · ${formatRupees(today.total)}`}
+        right={
+          <Pressable
+            onPress={() => router.push('/orders')}
+            style={({ pressed }) => [styles.ordersBtn, pressed && { opacity: 0.7 }]}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Orders"
+          >
+            <Ionicons name="receipt-outline" size={20} color={colors.primary} />
+            <Text style={styles.ordersText}>Orders</Text>
+          </Pressable>
+        }
       />
       {menu ? (
         <OrderEditor menu={menu} showOrderType={settings.showOrderType} onSubmit={onSubmit} />
@@ -74,3 +88,16 @@ export default function NewOrderScreen() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  ordersBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    height: 44,
+    borderRadius: radius.sm,
+    backgroundColor: colors.card,
+  },
+  ordersText: { color: colors.primary, fontWeight: '800', fontSize: 16 },
+});

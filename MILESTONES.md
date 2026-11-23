@@ -15,6 +15,7 @@ This is the delivery roadmap. Each milestone produces a working, testable app. C
 | [M6](#m6-install-on-the-restaurant-phone) | Install on the restaurant phone | ⬜ |
 | [v1.2](#v12-money-who-did-it--family-sync) | Money, who did it & family sync | 🚧 |
 | [v1.4](#v14-who-changed-what-alerts) | "Who changed what" alerts | 🚧 |
+| [v1.5](#v15-stock-tab-custom-dates-cashupi-after-expenses) | Stock tab, custom dates, cash/UPI after expenses | 🚧 |
 | [Later](#later-post-v1-ideas) | Post-v1 ideas | ⬜ |
 
 ---
@@ -193,6 +194,31 @@ Ships as an online update (`npm run publish-update`): no native changes, `runtim
 - [ ] Check on two real phones: edit an order and an expense on one, see the alert on the other
 
 **Not included (needs a new APK/iPhone build):** real phone notifications that arrive while the app is closed (`expo-notifications` + Expo push, FCM key in EAS, Apple push key).
+
+---
+
+## v1.5: Stock tab, custom dates, cash/UPI after expenses
+
+Ships as an online update (`npm run publish-update`): no native changes, `runtimeVersion` stays "1". Phones on v1.4 keep syncing and ignore the stock data until they update.
+
+- [x] Database v4 (v3 → v4): `stock_items` and `stock_entries`. The starting list (Hyderabadi and Tandoor Chicken Biryani; Rice, Barista and Oil kept at home; Chicken, Onion, Coriander, Pudina, Ginger, Garlic and Salt bought daily) has fixed ids on every phone and isn't uploaded until someone edits it
+- [x] **Stock** tab, browsable by day:
+  - Biryani cards: Cooked (kg, several batches), Left (kg), Staff (grams, one per portion), Sold ≈ cooked − left − staff, and plates sold (half/full, matched by name)
+  - **Kept at home**: in stock now = bought − sent to shop, with a low-stock warning
+  - **Bought today** (daily items)
+  - Entries list with who did it, edit, and delete with UNDO
+  - Adding while viewing an earlier day saves the entry on that day (e.g. last night's leftover)
+- [x] A purchase can also save its expense ("Paid ₹ … Cash/UPI"), filed under the item's expense category. Editing or deleting the stock entry changes or deletes that expense too
+- [x] **Edit stock items** screen: add, rename, type, unit, low-stock level, expense category, hide, delete
+- [x] Sync: `stock_items` and `stock` collections (no rules change); alerts like "Stock: Rice · Bought 25 kg added by **Mom**" open the Stock tab
+- [x] Backup format v3 includes stock; restoring an older backup starts from the default stock list
+- [x] Summary: **Dates** option with From / To calendar (pure JS, no native picker); **Cash in hand after expenses** and **UPI after expenses** cards; **Kitchen** card for the period; all in the shared text
+- [x] Settings: app version on each phone as one short line per phone; version footer is one small line
+- [x] Version 1.5.0 (versionCode / buildNumber unchanged)
+- [x] Orders moved out of the dock to an **Orders** button at the top right of New Order (5 tabs: New Order, Money, Stock, Summary, Settings)
+- [x] Published to the `preview` channel on 2026-11-23 (update group `6b08f5c4-8ef5-4211-a566-96cf4dc7ddda`); screens checked on an iOS simulator with sample data (no sync)
+- [x] Fix: the Orders button did nothing (a tab hidden with `href: null` can't be opened in this Expo Router version). Orders is now a stack screen with a back arrow. Published 2026-11-23 (update group `35781d8d-2215-43d3-b616-a1b702e38903`)
+- [ ] Check on two real phones: buy rice with ₹ paid on one, see the stock and the expense on the other
 
 ---
 

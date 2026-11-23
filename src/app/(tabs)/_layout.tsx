@@ -25,8 +25,8 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={tab('New Order', 'add-circle-outline', 'add-circle')} />
-      <Tabs.Screen name="orders" options={tab('Orders', 'receipt-outline', 'receipt')} />
       <Tabs.Screen name="money" options={tab('Money', 'wallet-outline', 'wallet')} />
+      <Tabs.Screen name="stock" options={tab('Stock', 'basket-outline', 'basket')} />
       <Tabs.Screen name="summary" options={tab('Summary', 'bar-chart-outline', 'bar-chart')} />
       <Tabs.Screen name="settings" options={tab('Settings', 'settings-outline', 'settings')} />
     </Tabs>

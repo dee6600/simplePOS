@@ -18,7 +18,9 @@ export default function RootLayout() {
             <StatusBar style="dark" />
             <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
               <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="orders" />
               <Stack.Screen name="order/[id]" />
+              <Stack.Screen name="stock-items" />
             </Stack>
             <LoginGate />
           </ToastProvider>

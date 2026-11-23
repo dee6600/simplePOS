@@ -11,9 +11,11 @@ type Props = {
   subtitle?: string;
   onBack?: () => void;
   right?: ReactNode;
+  /** Lines the subtitle may wrap to before it is cut off (default 1). */
+  subtitleLines?: number;
 };
 
-export function ScreenHeader({ title, subtitle, onBack, right }: Props) {
+export function ScreenHeader({ title, subtitle, onBack, right, subtitleLines = 1 }: Props) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.wrap, { paddingTop: insets.top + 8 }]}>
@@ -27,7 +29,7 @@ export function ScreenHeader({ title, subtitle, onBack, right }: Props) {
           {title}
         </Text>
         {subtitle ? (
-          <Text style={styles.subtitle} numberOfLines={1}>
+          <Text style={styles.subtitle} numberOfLines={subtitleLines}>
             {subtitle}
           </Text>
         ) : null}

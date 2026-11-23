@@ -10,10 +10,13 @@ import { computeBalance } from '../../lib/balance';
 import { openTestDb } from '../../test/nodeSqlite';
 import { listMenu, updateMenuItem } from '../../db/menu';
 import { buildBackup, restoreBackup } from '../../db/backup';
-import { migrateDb } from '../../db/migrate';
+import { DEFAULT_STOCK, migrateDb } from '../../db/migrate';
 import { addMoneyEntry, getBalanceSums, listMoneyEntries, updateMoneyEntry } from '../../db/money';
 import { createOrder, listOrders, setOrderDeleted, setOrderStatus, updateOrder } from '../../db/orders';
 import { getSettings, saveSetting, setDeviceSetting } from '../../db/settings';
+import {
+  addStockEntry, addStockItem, getStockLevels, listStockEntries, listStockItems, setStockEntryDeleted, updateStockItem,
+} from '../../db/stock';
 import type { RemoteChange } from '../../lib/changes';
 import { countDirty } from '../mapping';
 import { prepareCreate, prepareJoin } from '../connect';
@@ -397,6 +400,50 @@ test('other phones are told what changed and who did it', async () => {
   expect(pick(mom)).toEqual([{ kind: 'order', action: 'edited', actor: '', label: 'Order #1' }]);
   expect((await listOrders(mom.db, ALL))[0]).toMatchObject({ status: 'upi', updated_by: '' });
 
+  shop.engine.stop();
+  mom.engine.stop();
+});
+
+test('stock: the starting list is shared without duplicates; entries, edits and their expenses sync', async () => {
+  const cloud = new FakeCloud();
+  const shop = await phone(cloud, 'Dad');
+  await prepareCreate(shop.db, 'shop1', 'e');
+  await shop.engine.start();
+  await settle(shop);
+  expect(cloud.count('stock_items')).toBe(0); // untouched defaults stay on each phone
+
+  const mom = await phone(cloud, 'Mom');
+  await prepareJoin(mom.db, 'shop1', 'e', false);
+  await mom.engine.start();
+  await settle(shop, mom);
+
+  // Dad renames Barista and adds Tomato; Mom sees both, still one Barista.
+  const barista = (await listStockItems(shop.db)).find((i) => i.uid === 'stock-barista')!;
+  await updateStockItem(shop.db, barista.id, { ...barista, name: 'Birista', active: true });
+  await addStockItem(shop.db, { name: 'Tomato', unit: 'kg', grp: 'daily', active: true, low_level: null, expense_category: 'Vegetables & Masala' });
+  // Mom buys rice and pays cash; Dad sees the stock and the expense.
+  const rice = (await listStockItems(mom.db)).find((i) => i.uid === 'stock-rice')!;
+  await addStockEntry(mom.db, rice, { kind: 'in', qty: 25, note: '', paid: { amount: 1500, method: 'cash' } });
+  shop.engine.schedulePush();
+  mom.engine.schedulePush();
+  await settle(shop, mom);
+
+  const momItems = await listStockItems(mom.db);
+  expect(momItems.filter((i) => i.uid === 'stock-barista').map((i) => i.name)).toEqual(['Birista']);
+  expect(momItems.some((i) => i.name === 'Tomato')).toBe(true);
+  expect(momItems).toHaveLength(DEFAULT_STOCK.length + 1);
+  expect((await getStockLevels(shop.db)).get('stock-rice')).toBe(25);
+  const [dadCopy] = await listStockEntries(shop.db, ALL);
+  expect(dadCopy).toMatchObject({ created_by: 'Mom', paid_amount: 1500, paid_method: 'cash' });
+  expect(shop.alerts.some((a) => a.kind === 'stock' && a.label === 'Stock: Rice · Bought 25 kg' && a.actor === 'Mom')).toBe(true);
+
+  // Dad deletes it on his phone: the expense goes on both phones.
+  await setStockEntryDeleted(shop.db, dadCopy, true);
+  shop.engine.schedulePush();
+  await settle(shop, mom);
+  expect(await listStockEntries(mom.db, ALL)).toHaveLength(0);
+  expect(await listMoneyEntries(mom.db, ALL)).toHaveLength(0);
+  expect(await countDirty(mom.db)).toBe(0);
   shop.engine.stop();
   mom.engine.stop();
 });
