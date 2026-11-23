@@ -31,6 +31,8 @@ describe('stock maths', () => {
     expect(parseQty('0')).toBeNull();
     expect(parseQty('')).toBeNull();
     expect(formatQty(0.1 + 0.2, 'kg')).toBe('0.3 kg');
+    expect(formatQty(250, 'g')).toBe('250 g');
+    expect(formatQty(2, 'packet')).toBe('2 packet');
   });
 
   it('matches plates sold to the biryani by its first word', () => {

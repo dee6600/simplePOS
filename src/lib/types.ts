@@ -79,7 +79,7 @@ export type StockItem = {
   id: number;
   uid: string;
   name: string;
-  /** kg, L, bunch, pcs, packet. Quantities are stored in this unit (staff portions in kg, shown in grams). */
+  /** kg, g, L, packet, bunch, pcs. Quantities are stored in this unit (staff portions in kg, shown in grams). */
   unit: string;
   grp: StockGroup;
   sort_order: number;

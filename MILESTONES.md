@@ -222,6 +222,18 @@ Ships as an online update (`npm run publish-update`): no native changes, `runtim
 
 ---
 
+## v1.5.1: Units, update button, tidy version list
+
+Online update; `runtimeVersion` stays "1".
+
+- [x] Stock item units: **g** (grams) added next to kg; **packet** moved up next to L (for oil in packets). Order: kg, g, L, packet, bunch, pcs
+- [x] Settings footer: the **Check for app update** button and version line are back to how they were in v1.3/v1.4
+- [x] Family sync → app versions: one tidy row per phone (name · phone type, version and update date underneath, a green **Latest** or red **Needs update** tag)
+- [x] Version 1.5.1
+- [x] Published to the `preview` channel on 2026-11-23 (update group `16b16b2d-d346-428f-aa5b-32a2f02dddf8`)
+
+---
+
 ## Later: post-v1 ideas
 
 These aren't scheduled. Reprioritize them based on how the restaurant uses the app.

@@ -1,7 +1,7 @@
 import type { ItemTotal } from './summary';
 import type { StockEntry, StockGroup, StockItem, StockKind } from './types';
 
-export const STOCK_UNITS = ['kg', 'L', 'bunch', 'pcs', 'packet'] as const;
+export const STOCK_UNITS = ['kg', 'g', 'L', 'packet', 'bunch', 'pcs'] as const;
 
 export const GROUP_LABEL: Record<StockGroup, string> = {
   cooked: 'Biryani (weighed)',

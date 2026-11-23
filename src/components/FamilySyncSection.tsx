@@ -186,24 +186,35 @@ function versionKey(p: DeviceInfo): string {
   return `${v}|${String(p.update_created_at ?? 0).padStart(15, '0')}`;
 }
 
-/** One short line per phone: "Mom · Android · v1.5.0 (22 Nov)   ✓". */
+/**
+ * One tidy row per phone:
+ *   Mom · Android                 [ Latest ]
+ *   v1.5.1 · updated 23 Nov
+ */
 function PhoneVersions({ phones }: { phones: DeviceInfo[] }) {
   const latest = phones.reduce((max, p) => (versionKey(p) > max ? versionKey(p) : max), '');
   return (
-    <View>
-      {phones.map((p) => {
+    <View style={styles.phoneList}>
+      {phones.map((p, i) => {
         const upToDate = versionKey(p) === latest;
         const platform = p.platform === 'ios' ? 'iPhone' : p.platform === 'android' ? 'Android' : p.platform;
-        const updated = p.update_created_at ? ` (${formatDayMonth(new Date(p.update_created_at))})` : '';
+        const updated = p.update_created_at ? `updated ${formatDayMonth(new Date(p.update_created_at))}` : 'as installed';
         return (
-          <View key={p.device_id} style={styles.phoneRow}>
-            <Text style={styles.phoneText} numberOfLines={1}>
-              <Text style={styles.phoneName}>{p.user_name || 'No name'}</Text> · {platform} · v{p.app_version}
-              {updated}
-            </Text>
-            <Text style={[styles.phoneTag, { color: upToDate ? '#15803D' : colors.danger }]}>
-              {upToDate ? '✓' : 'Update'}
-            </Text>
+          <View key={p.device_id} style={[styles.phoneRow, i > 0 && styles.phoneDivider]}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.phoneName} numberOfLines={1}>
+                {p.user_name || 'No name'}
+                <Text style={styles.phonePlatform}> · {platform}</Text>
+              </Text>
+              <Text style={styles.phoneMeta}>
+                v{p.app_version} · {updated}
+              </Text>
+            </View>
+            <View style={[styles.pill, { backgroundColor: upToDate ? '#DCFCE7' : '#FEE2E2' }]}>
+              <Text style={[styles.pillText, { color: upToDate ? '#15803D' : colors.danger }]}>
+                {upToDate ? 'Latest' : 'Needs update'}
+              </Text>
+            </View>
           </View>
         );
       })}
@@ -230,10 +241,14 @@ const styles = StyleSheet.create({
   outline: { backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border },
   bigBtn: { flex: 1, height: 52, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
   bigBtnText: { color: colors.white, fontSize: 16, fontWeight: '800' },
-  phoneRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  phoneText: { flex: 1, fontSize: 14, color: colors.muted },
-  phoneName: { fontWeight: '800', color: colors.text },
-  phoneTag: { fontSize: 14, fontWeight: '800' },
+  phoneList: { backgroundColor: colors.bg, borderRadius: radius.sm, paddingHorizontal: 12 },
+  phoneRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
+  phoneDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  phoneName: { fontSize: 16, fontWeight: '800', color: colors.text },
+  phonePlatform: { fontSize: 14, fontWeight: '600', color: colors.muted },
+  phoneMeta: { fontSize: 13, color: colors.muted, marginTop: 2 },
+  pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  pillText: { fontSize: 13, fontWeight: '800' },
   link: { alignSelf: 'center', paddingVertical: 4, minHeight: 32, justifyContent: 'center' },
   linkText: { color: colors.primary, fontSize: 14, fontWeight: '800' },
 });
